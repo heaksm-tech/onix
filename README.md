@@ -14,13 +14,25 @@ Internal B2B CRM for S. D. Melas Trading Business, managing company records, emp
 ## Requirements
 
 Docker Desktop (or any Docker engine) with Compose v2. **Nothing else** — Node, npm
-and PostgreSQL all run inside containers.
+and PostgreSQL all run inside containers, and no local install of any of them is
+used or needed.
+
+`make` is optional. Every target in the `Makefile` is a one-line `docker compose`
+command, shown alongside each shortcut below.
 
 ## Getting started
 
 ```bash
 cp .env.example .env && docker compose up --build
 ```
+
+That is the whole setup. Verified from a clean clone on a machine with only Docker:
+it builds both images, waits for PostgreSQL, applies all migrations, and serves
+the app.
+
+If a port is already taken — a local PostgreSQL on 5432 is the usual culprit —
+change `POSTGRES_PORT`, `API_PORT` or `WEB_PORT` in `.env` and start again. Only
+the host side moves; nothing inside the compose network changes.
 
 That builds three services, waits for PostgreSQL to become healthy, applies pending
 migrations, and starts both apps with hot reload:
@@ -35,15 +47,33 @@ migrations, and starts both apps with hot reload:
 The home page shows a live API/database status indicator — green means the whole
 chain is wired up correctly.
 
-A `Makefile` wraps the common Compose invocations. Run `make help` for the list.
+A `Makefile` wraps the common Compose invocations. Run `make help` for the full
+list. Each is a plain Compose command if you would rather not use `make`:
 
 ```bash
-make up        # docker compose up --build
-make down      # stop
-make logs      # tail logs
-make psql      # open a psql shell
-make clean     # stop and delete the database volume
+make up      # docker compose up --build
+make down    # docker compose down
+make logs    # docker compose logs -f
+make psql    # docker compose exec postgres psql -U onix -d onix_dev
+make clean   # docker compose down -v          (deletes the database volume)
 ```
+
+## Daily workflow
+
+**You do not restart anything to see code changes.** Source is bind-mounted into
+both containers; `tsx watch` restarts the API and Next's dev server refreshes the
+web app. Save a file — a new route, a new page — and it is live in about a second.
+
+Rebuilds are only needed when something *outside* the bind mount changes:
+
+| Changed                              | Run                                          |
+| ------------------------------------ | -------------------------------------------- |
+| Any file under `src/`                | nothing — auto-reloads                       |
+| Dependencies in `package.json`       | `make install-api pkg=x` then `docker compose build api` |
+| A `Dockerfile`                       | `docker compose build <service>`             |
+| Environment values in `.env`         | `docker compose up -d` (recreates containers) |
+| `NEXT_PUBLIC_*`                      | `docker compose build web` — inlined at build time |
+| Added a migration                    | `make migrate-up`                            |
 
 ## Layout
 
