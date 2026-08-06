@@ -228,16 +228,16 @@ identically, since each app is a fully self-contained package.
 Migrations are TypeScript and run through `tsx`.
 
 ```bash
-npm run migrate:create -- companies   # scaffold a migration
-npm run migrate:up                    # apply pending
-npm run migrate:down                  # roll back the last one
+npm run migrate:create -- follow-ups   # scaffold a migration
+npm run migrate:up                     # apply pending
+npm run migrate:down                   # roll back the last one
 ```
 
 The baseline migration installs `pgcrypto` (for `gen_random_uuid()`) and a shared
 `set_updated_at()` trigger function. Attach it to any table with a timestamp:
 
 ```ts
-pgm.createTrigger('companies', 'set_updated_at', {
+pgm.createTrigger('follow_ups', 'set_updated_at', {
   when: 'BEFORE',
   operation: 'UPDATE',
   level: 'ROW',
@@ -245,7 +245,7 @@ pgm.createTrigger('companies', 'set_updated_at', {
 });
 ```
 
-`apps/api/migrations/*_create-companies.ts` is the worked example to copy from —
+`apps/api/migrations/*_create-users.ts` is the worked example to copy from —
 it shows the uuid, timestamp, enum, index and constraint conventions this project
 uses.
 
@@ -288,7 +288,7 @@ onix/
 
 ### Where to add things
 
-- **A new table** → `npm run migrate:create -- companies`, then edit the generated
+- **A new table** → `npm run migrate:create -- follow-ups`, then edit the generated
   file in `apps/api/migrations/`.
 - **A new endpoint** → create `apps/api/src/modules/<feature>/` with its router,
   service and queries, then mount it in `apps/api/src/routes/index.ts`.

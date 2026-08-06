@@ -5,10 +5,11 @@ export const shorthands: undefined = undefined;
 /**
  * The `users` table — the people who work in the CRM.
  *
- * Follows the conventions established by the companies migration: uuid primary
- * key, native enum for a closed set of values, timestamptz audit columns kept
- * current by the shared set_updated_at() trigger, and rules enforced in the
- * database rather than only in application code.
+ * As the first domain table, this is also the reference every later migration
+ * should copy from: uuid primary key, native enum for a closed set of values,
+ * timestamptz audit columns kept current by the shared set_updated_at()
+ * trigger, and rules enforced in the database rather than only in application
+ * code.
  *
  * Users are deactivated, never deleted. Setting active = false keeps the row
  * intact so historical records that reference it — who logged a call, who owns
