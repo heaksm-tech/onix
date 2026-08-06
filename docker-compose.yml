@@ -1,0 +1,71 @@
+# Development stack. `docker compose up` builds and runs everything.
+# Source is bind-mounted, so both services hot-reload on save.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: onix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-onix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-onix}
+      POSTGRES_DB: ${POSTGRES_DB:-onix_dev}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - onix-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-onix} -d ${POSTGRES_DB:-onix_dev}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+      target: dev
+    container_name: onix-api
+    restart: unless-stopped
+    # Apply pending migrations, then start the watcher.
+    command: sh -c "npm run migrate:up && npm run dev"
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      DATABASE_URL: postgres://${POSTGRES_USER:-onix}:${POSTGRES_PASSWORD:-onix}@postgres:5432/${POSTGRES_DB:-onix_dev}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+    ports:
+      - '${API_PORT:-4000}:4000'
+    volumes:
+      # Bind-mount the source for hot reload, but keep the image's node_modules
+      # (built for the container's platform) from being shadowed by the host's.
+      - ./apps/api:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+      target: dev
+    container_name: onix-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      # Server components talk to the API over the compose network...
+      API_URL: http://api:4000/api/v1
+      # ...while browser code uses the host-published port.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api/v1}
+      WATCHPACK_POLLING: 'true'
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - api
+
+volumes:
+  onix-pgdata:

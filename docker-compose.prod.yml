@@ -1,0 +1,70 @@
+# Production-ish stack: compiled images, no bind mounts, migrations run as a
+# separate one-shot service that must succeed before the API starts.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+    volumes:
+      - onix-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: ./apps/api
+      target: runner
+    command: npm run migrate:up
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    build:
+      context: ./apps/api
+      target: runner
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      CORS_ORIGIN: ${CORS_ORIGIN:?required}
+    ports:
+      - '${API_PORT:-4000}:4000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ./apps/web
+      target: runner
+      args:
+        # NEXT_PUBLIC_* values are inlined at build time, so this must be the
+        # URL the *browser* will use — rebuild the image if it changes.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?required}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_URL: http://api:4000/api/v1
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    depends_on:
+      - api
+
+volumes:
+  onix-pgdata:
