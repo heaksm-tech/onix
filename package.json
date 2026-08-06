@@ -1,0 +1,42 @@
+{
+  "name": "onix",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Internal B2B CRM for S. D. Melas Trading Business — local development entrypoint",
+  "engines": {
+    "node": ">=22"
+  },
+  "//": [
+    "This file exists purely as a convenience launcher for running both apps",
+    "locally without Docker. It deliberately does NOT declare npm workspaces:",
+    "workspaces hoist node_modules to the root and produce a single root",
+    "lockfile, which would break the per-app lockfiles that `npm ci` relies on",
+    "inside each Dockerfile. Each app stays a fully independent package; these",
+    "scripts only shell into them."
+  ],
+  "scripts": {
+    "setup": "npm run init:env && npm run install:all && npm run db:setup && npm run migrate:up",
+    "init:env": "node scripts/init-env.mjs",
+    "install:all": "npm --prefix apps/api ci && npm --prefix apps/web ci",
+    "dev": "concurrently -n api,web -c blue,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/api run build && npm --prefix apps/web run build",
+    "start": "concurrently -n api,web -c blue,magenta \"npm:start:api\" \"npm:start:web\"",
+    "start:api": "npm --prefix apps/api run start",
+    "start:web": "npm --prefix apps/web run start",
+    "typecheck": "npm --prefix apps/api run typecheck && npm --prefix apps/web run typecheck",
+    "lint": "npm --prefix apps/api run lint && npm --prefix apps/web run lint",
+    "format": "npm --prefix apps/api run format && npm --prefix apps/web run format",
+    "format:check": "npm --prefix apps/api run format:check && npm --prefix apps/web run format:check",
+    "test": "npm --prefix apps/api run test",
+    "db:setup": "npm --prefix apps/api run db:setup",
+    "migrate": "npm --prefix apps/api run migrate --",
+    "migrate:up": "npm --prefix apps/api run migrate:up",
+    "migrate:down": "npm --prefix apps/api run migrate:down",
+    "migrate:create": "npm --prefix apps/api run migrate:create --"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.4"
+  }
+}
