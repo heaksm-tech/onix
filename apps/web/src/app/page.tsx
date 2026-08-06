@@ -9,21 +9,6 @@ export default function HomePage() {
       </header>
 
       <ApiStatus />
-
-      <section className="flex flex-col gap-3 text-sm">
-        <h2 className="font-medium">Next steps</h2>
-        <ul className="flex list-disc flex-col gap-1 pl-5 opacity-70">
-          <li>
-            Add a migration: <code className="font-mono">make migrate-create name=companies</code>
-          </li>
-          <li>
-            Add an API module under <code className="font-mono">apps/api/src/modules/</code>
-          </li>
-          <li>
-            Add pages and components under <code className="font-mono">apps/web/src/app/</code>
-          </li>
-        </ul>
-      </section>
     </main>
   );
 }
