@@ -42,6 +42,7 @@ Thumbs.db
 # Claude Code — shared settings.json is committed, per-developer overrides are not
 .claude
 .claude/settings.local.json
+CLAUDE.md
 
 # Misc
 .cache/
