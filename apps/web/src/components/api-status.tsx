@@ -4,7 +4,7 @@ type Health = { status: string; database: string };
 
 /**
  * Server component that proves the web → API → database path is wired up.
- * Safe to delete once real features exist.
+ * Currently unused; kept for a future system-status element.
  */
 export async function ApiStatus() {
   let health: Health | null = null;
@@ -13,20 +13,20 @@ export async function ApiStatus() {
   try {
     health = await apiFetch<Health>('/health/ready', { cache: 'no-store' });
   } catch (err) {
-    error = err instanceof Error ? err.message : 'Unknown error';
+    error = err instanceof Error ? err.message : 'Άγνωστο σφάλμα';
   }
 
   const ok = health?.status === 'ok';
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-black/10 p-4 dark:border-white/15">
-      <h2 className="text-sm font-medium">API connection</h2>
+    <section className="flex flex-col gap-2 rounded-lg border border-line p-4">
+      <h2 className="text-sm font-medium">Σύνδεση API</h2>
       <p className="flex items-center gap-2 font-mono text-sm">
         <span
           aria-hidden
-          className={`inline-block size-2 rounded-full ${ok ? 'bg-green-500' : 'bg-red-500'}`}
+          className={`inline-block size-2 rounded-full ${ok ? 'bg-positive' : 'bg-negative'}`}
         />
-        {ok ? 'API and database reachable' : (error ?? 'API unreachable')}
+        {ok ? 'API και βάση δεδομένων διαθέσιμα' : (error ?? 'Το API δεν αποκρίνεται')}
       </p>
     </section>
   );

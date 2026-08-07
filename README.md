@@ -10,6 +10,9 @@ Internal B2B CRM for S. D. Melas Trading Business, managing company records, emp
 | Backend  | Node.js 22, Express 5, TypeScript                 |
 | Database | PostgreSQL 14+, `pg`, node-pg-migrate             |
 
+Building UI? Follow the [UI style guide](apps/web/STYLEGUIDE.md) — design
+tokens, components, navigation model, and the Greek-first language rules.
+
 ---
 
 ## 1. Install the prerequisites
