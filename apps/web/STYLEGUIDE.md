@@ -18,8 +18,9 @@ does not carry information.
    hex values) in components. Use the token utilities from `src/app/globals.css`
    (`bg-surface`, `text-ink-secondary`, `border-line`, …). If a new color is
    genuinely needed, add it as a token there first, in both light and dark.
-2. **No `dark:` variants.** Dark mode works by token values flipping with
-   `prefers-color-scheme`. Components must be theme-blind.
+2. **No `dark:` variants.** Each token carries both themes via `light-dark()`;
+   which one resolves is decided by `color-scheme` at the root. Components must
+   be theme-blind — they never know or ask which theme is active.
 3. **Greek copy everywhere** (see §7 for the short list of allowed English).
 4. **Reuse the primitives** in `src/components/` (`Card`, `Button`,
    `PageHeader`, `EmptyState`, icons). Do not add UI libraries, icon packages,
@@ -40,21 +41,31 @@ Defined in [`src/app/globals.css`](src/app/globals.css) as CSS variables mapped
 into Tailwind v4 via `@theme inline`. Use them as `bg-*`, `text-*`, `border-*`
 utilities.
 
-| Token           | Role                                              | Light     | Dark      |
-| --------------- | ------------------------------------------------- | --------- | --------- |
-| `canvas`        | App background (page, sidebar, topbar)            | `#f8f8f7` | `#101012` |
-| `surface`       | Cards, active nav pill, inputs                    | `#ffffff` | `#18181b` |
-| `surface-hover` | Hover state of `surface` elements                 | `#f4f4f3` | `#202024` |
-| `ink`           | Primary text; primary button background           | `#1a1a1e` | `#f2f2f3` |
-| `ink-secondary` | Supporting text, descriptions, inactive nav       | `#5b5b66` | `#a6a6af` |
-| `ink-faint`     | Placeholders, captions, disabled, icons at rest   | `#9b9ba4` | `#6b6b74` |
-| `line`          | Hairline borders, dividers                        | `#e7e7e4` | `#26262b` |
-| `line-strong`   | Border hover emphasis                             | `#d4d4d1` | `#333338` |
-| `accent`        | THE accent (indigo): active icons, focus, links   | `#4f46e5` | `#818cf8` |
-| `accent-strong` | Accent hover / gradient end                       | `#4338ca` | `#a5b4fc` |
-| `accent-soft`   | Accent-tinted chip/icon backgrounds               | `#eef0fd` | `#232345` |
-| `positive`      | Success (status dots, confirmations)              | `#059669` | `#34d399` |
-| `negative`      | Errors, destructive                               | `#dc2626` | `#f87171` |
+Each token declares both values at once — `--canvas: light-dark(#f8f8f7,
+#101012)` — and `color-scheme` on `:root` decides which one resolves:
+
+- **`:root { color-scheme: light dark }`** — the default, follows the OS.
+- **`<html data-scheme="light">` / `"dark"`** — explicit override, wins over the
+  OS. Removing the attribute returns to following the OS.
+
+Adding a token means adding one `light-dark()` line; there is no second block to
+keep in sync, and no media query anywhere.
+
+| Token           | Role                                            | Light     | Dark      |
+| --------------- | ----------------------------------------------- | --------- | --------- |
+| `canvas`        | App background (page, sidebar, topbar)          | `#f8f8f7` | `#101012` |
+| `surface`       | Cards, active nav pill, inputs                  | `#ffffff` | `#18181b` |
+| `surface-hover` | Hover state of `surface` elements               | `#f4f4f3` | `#202024` |
+| `ink`           | Primary text; primary button background         | `#1a1a1e` | `#f2f2f3` |
+| `ink-secondary` | Supporting text, descriptions, inactive nav     | `#5b5b66` | `#a6a6af` |
+| `ink-faint`     | Placeholders, captions, disabled, icons at rest | `#9b9ba4` | `#6b6b74` |
+| `line`          | Hairline borders, dividers                      | `#e7e7e4` | `#26262b` |
+| `line-strong`   | Border hover emphasis                           | `#d4d4d1` | `#333338` |
+| `accent`        | THE accent (indigo): active icons, focus, links | `#4f46e5` | `#818cf8` |
+| `accent-strong` | Accent hover / gradient end                     | `#4338ca` | `#a5b4fc` |
+| `accent-soft`   | Accent-tinted chip/icon backgrounds             | `#eef0fd` | `#232345` |
+| `positive`      | Success (status dots, confirmations)            | `#059669` | `#34d399` |
+| `negative`      | Errors, destructive                             | `#dc2626` | `#f87171` |
 
 Shadows: `shadow-card` (default card/pill elevation — includes a faint 1px
 ring) and `shadow-pop` (menus, popovers).
@@ -70,16 +81,16 @@ accent. Alpha tints of ink (`bg-ink/5`) are the standard hover wash.
 
 System font stack (`--font-sans`, already on `<body>`); no webfonts.
 
-| Use                        | Classes                                              |
-| -------------------------- | ---------------------------------------------------- |
-| Page title (`PageHeader`)  | `text-xl font-semibold tracking-tight`               |
-| Card / section heading     | `text-sm font-semibold`                              |
-| Empty-state title          | `text-base font-semibold tracking-tight`             |
-| Body & controls            | `text-sm`                                            |
-| Submenu items              | `text-[13px]`                                        |
-| Captions, hints            | `text-xs text-ink-faint`                             |
-| Overline labels (sidebar)  | `text-[11px] font-medium uppercase tracking-wider text-ink-faint` |
-| Numbers/metrics            | add `tabular-nums`                                   |
+| Use                       | Classes                                                           |
+| ------------------------- | ----------------------------------------------------------------- |
+| Page title (`PageHeader`) | `text-xl font-semibold tracking-tight`                            |
+| Card / section heading    | `text-sm font-semibold`                                           |
+| Empty-state title         | `text-base font-semibold tracking-tight`                          |
+| Body & controls           | `text-sm`                                                         |
+| Submenu items             | `text-[13px]`                                                     |
+| Captions, hints           | `text-xs text-ink-faint`                                          |
+| Overline labels (sidebar) | `text-[11px] font-medium uppercase tracking-wider text-ink-faint` |
+| Numbers/metrics           | add `tabular-nums`                                                |
 
 Greek text renders fine in all-caps via CSS `uppercase` (browsers drop the
 tonos correctly) — write source copy in normal case.
@@ -119,7 +130,7 @@ tonos correctly) — write source copy in normal case.
 All in `src/components/` — import, don't duplicate:
 
 - **`Card`** — the only surface primitive (`border-line bg-surface shadow-card
-  rounded-xl`). Everything card-like uses it.
+rounded-xl`). Everything card-like uses it.
 - **`Button`** — variants: `primary` (ink bg — max one per view), `secondary`
   (bordered surface), `ghost` (text + hover wash). Extend with variants, not
   one-off classes.
@@ -200,13 +211,13 @@ src/app/(app)/<section>/<sub-page>/page.tsx
 
 ## 10. Quick do / don't
 
-| Do                                             | Don't                                      |
-| ---------------------------------------------- | ------------------------------------------ |
-| `bg-surface`, `text-ink-secondary`             | `bg-white`, `text-gray-500`, hex in JSX    |
-| Extend `Button` with a variant                 | One-off `<button className="…">`           |
-| Add icons by hand in `icons.tsx`               | `npm install lucide-react` (or any UI lib) |
-| Greek copy, formal plural                      | English strings, informal («μπες»)         |
-| `focus-visible:ring-2 focus-visible:ring-accent/60` | Removing focus outlines entirely      |
-| Group nav item → submenu only                  | Giving a group its own page/route          |
-| One ink `primary` button per view              | Accent-colored or multiple primary buttons |
-| `prefers-color-scheme` via tokens              | `dark:` classes in components              |
+| Do                                                  | Don't                                      |
+| --------------------------------------------------- | ------------------------------------------ |
+| `bg-surface`, `text-ink-secondary`                  | `bg-white`, `text-gray-500`, hex in JSX    |
+| Extend `Button` with a variant                      | One-off `<button className="…">`           |
+| Add icons by hand in `icons.tsx`                    | `npm install lucide-react` (or any UI lib) |
+| Greek copy, formal plural                           | English strings, informal («μπες»)         |
+| `focus-visible:ring-2 focus-visible:ring-accent/60` | Removing focus outlines entirely           |
+| Group nav item → submenu only                       | Giving a group its own page/route          |
+| One ink `primary` button per view                   | Accent-colored or multiple primary buttons |
+| `prefers-color-scheme` via tokens                   | `dark:` classes in components              |

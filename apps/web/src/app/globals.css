@@ -28,42 +28,35 @@
   --shadow-pop: 0 4px 16px rgb(16 16 20 / 0.08);
 }
 
+/*
+ * Each token carries both themes. Which one resolves is decided by
+ * `color-scheme`: the default below follows the OS, and `data-scheme` on
+ * <html> overrides it. Removing the attribute returns to following the OS.
+ */
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
 
-  --canvas: #f8f8f7;
-  --surface: #ffffff;
-  --surface-hover: #f4f4f3;
-  --ink: #1a1a1e;
-  --ink-secondary: #5b5b66;
-  --ink-faint: #9b9ba4;
-  --line: #e7e7e4;
-  --line-strong: #d4d4d1;
-  --accent: #4f46e5;
-  --accent-strong: #4338ca;
-  --accent-soft: #eef0fd;
-  --positive: #059669;
-  --negative: #dc2626;
+  --canvas: light-dark(#f8f8f7, #101012);
+  --surface: light-dark(#ffffff, #18181b);
+  --surface-hover: light-dark(#f4f4f3, #202024);
+  --ink: light-dark(#1a1a1e, #f2f2f3);
+  --ink-secondary: light-dark(#5b5b66, #a6a6af);
+  --ink-faint: light-dark(#9b9ba4, #6b6b74);
+  --line: light-dark(#e7e7e4, #26262b);
+  --line-strong: light-dark(#d4d4d1, #333338);
+  --accent: light-dark(#4f46e5, #818cf8);
+  --accent-strong: light-dark(#4338ca, #a5b4fc);
+  --accent-soft: light-dark(#eef0fd, #232345);
+  --positive: light-dark(#059669, #34d399);
+  --negative: light-dark(#dc2626, #f87171);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
+:root[data-scheme='light'] {
+  color-scheme: light;
+}
 
-    --canvas: #101012;
-    --surface: #18181b;
-    --surface-hover: #202024;
-    --ink: #f2f2f3;
-    --ink-secondary: #a6a6af;
-    --ink-faint: #6b6b74;
-    --line: #26262b;
-    --line-strong: #333338;
-    --accent: #818cf8;
-    --accent-strong: #a5b4fc;
-    --accent-soft: #232345;
-    --positive: #34d399;
-    --negative: #f87171;
-  }
+:root[data-scheme='dark'] {
+  color-scheme: dark;
 }
 
 ::selection {
