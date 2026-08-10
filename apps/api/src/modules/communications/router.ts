@@ -1,8 +1,8 @@
-import { Router } from "express";
-import { z } from "zod";
+import { Router } from 'express';
+import { z } from 'zod';
 
-import { query, transaction } from "../../db/index.js";
-import { validate } from "../../middleware/validate.js";
+import { query, transaction } from '../../db/index.js';
+import { validate } from '../../middleware/validate.js';
 
 type Company = {
   id: string;
@@ -42,9 +42,7 @@ const createCommunicationInput = z
     userId: z.string().uuid(),
     contactName: optionalText(150),
     contactRole: optionalText(100),
-    outcome: z
-      .enum(["no_answer", "callback", "interested", "not_interested"])
-      .optional(),
+    outcome: z.enum(['no_answer', 'callback', 'interested', 'not_interested']).optional(),
     interestLevel: z.number().int().min(1).max(5).optional(),
     notes: optionalText(10_000),
     nextAction: optionalText(255),
@@ -53,9 +51,9 @@ const createCommunicationInput = z
   .superRefine((value, context) => {
     if (Boolean(value.companyId) === Boolean(value.company)) {
       context.addIssue({
-        code: "custom",
-        message: "Επιλέξτε υπάρχοντα προμηθευτή ή συμπληρώστε νέο προμηθευτή.",
-        path: ["companyId"],
+        code: 'custom',
+        message: 'Επιλέξτε υπάρχοντα προμηθευτή ή συμπληρώστε νέο προμηθευτή.',
+        path: ['companyId'],
       });
     }
   });
@@ -64,7 +62,7 @@ type CreateCommunicationInput = z.infer<typeof createCommunicationInput>;
 
 export const communicationsRouter: Router = Router();
 
-communicationsRouter.get("/companies", async (_req, res) => {
+communicationsRouter.get('/companies', async (_req, res) => {
   const companies = await query<Company>(
     `SELECT id, name, email, phone
        FROM companies
@@ -74,7 +72,7 @@ communicationsRouter.get("/companies", async (_req, res) => {
   res.json({ companies });
 });
 
-communicationsRouter.get("/users", async (_req, res) => {
+communicationsRouter.get('/users', async (_req, res) => {
   const users = await query<User>(
     `SELECT id, name, email
        FROM users
@@ -85,7 +83,7 @@ communicationsRouter.get("/users", async (_req, res) => {
 });
 
 communicationsRouter.post(
-  "/communications",
+  '/communications',
   validate(createCommunicationInput),
   async (req, res) => {
     const input = req.body as CreateCommunicationInput;
@@ -99,17 +97,13 @@ communicationsRouter.post(
           `INSERT INTO companies (name, email, phone)
          VALUES ($1, $2, $3)
          RETURNING id`,
-          [
-            input.company.name,
-            input.company.email ?? null,
-            input.company.phone ?? null,
-          ],
+          [input.company.name, input.company.email ?? null, input.company.phone ?? null],
         );
         companyId = company.rows[0]?.id;
         companyCreated = true;
       }
 
-      if (!companyId) throw new Error("Company id was not resolved");
+      if (!companyId) throw new Error('Company id was not resolved');
 
       const communication = await client.query<Communication>(
         `INSERT INTO communications (

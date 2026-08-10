@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata } from 'next';
 
-import { NewCommunicationForm } from "@/components/new-communication-form";
-import { PageHeader } from "@/components/page-header";
+import { NewCommunicationForm } from '@/components/new-communication-form';
+import { PageHeader } from '@/components/page-header';
 
-export const metadata: Metadata = { title: "Νέα επικοινωνία" };
+export const metadata: Metadata = { title: 'Νέα επικοινωνία' };
 
 export default function NewCommunicationPage() {
   return (

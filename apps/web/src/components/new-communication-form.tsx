@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 
-import { ApiError, apiFetch } from "@/lib/api";
-import { Button } from "./button";
-import { Card } from "./card";
+import { ApiError, apiFetch } from '@/lib/api';
+import { Button } from './button';
+import { Card } from './card';
 
 type Company = {
   id: string;
@@ -30,47 +30,37 @@ type FormValues = {
 };
 
 const emptyValues: FormValues = {
-  userId: "",
-  companyId: "",
-  companyName: "",
-  companyEmail: "",
-  companyPhone: "",
-  contactName: "",
-  contactRole: "",
-  outcome: "",
-  interestLevel: "",
-  notes: "",
-  nextAction: "",
-  nextActionAt: "",
+  userId: '',
+  companyId: '',
+  companyName: '',
+  companyEmail: '',
+  companyPhone: '',
+  contactName: '',
+  contactRole: '',
+  outcome: '',
+  interestLevel: '',
+  notes: '',
+  nextAction: '',
+  nextActionAt: '',
 };
 
 const controlClass =
-  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-card outline-none transition-colors placeholder:text-ink-faint focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-60";
-const labelClass = "mb-1.5 block text-sm font-medium text-ink";
+  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-card outline-none transition-colors placeholder:text-ink-faint focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-60';
+const labelClass = 'mb-1.5 block text-sm font-medium text-ink';
 
-function Field({
-  label,
-  children,
-  hint,
-}: {
-  label: string;
-  children: ReactNode;
-  hint?: string;
-}) {
+function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="block">
       <span className={labelClass}>{label}</span>
       {children}
-      {hint ? (
-        <span className="mt-1 block text-xs text-ink-faint">{hint}</span>
-      ) : null}
+      {hint ? <span className="mt-1 block text-xs text-ink-faint">{hint}</span> : null}
     </label>
   );
 }
 
 export function NewCommunicationForm() {
   const [values, setValues] = useState<FormValues>(emptyValues);
-  const [mode, setMode] = useState<"existing" | "new">("existing");
+  const [mode, setMode] = useState<'existing' | 'new'>('existing');
   const [companies, setCompanies] = useState<Company[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,16 +70,14 @@ export function NewCommunicationForm() {
 
   useEffect(() => {
     void Promise.all([
-      apiFetch<{ companies: Company[] }>("/companies"),
-      apiFetch<{ users: User[] }>("/users"),
+      apiFetch<{ companies: Company[] }>('/companies'),
+      apiFetch<{ users: User[] }>('/users'),
     ])
       .then(([companyData, userData]) => {
         setCompanies(companyData.companies);
         setUsers(userData.users);
       })
-      .catch(() =>
-        setError("Δεν ήταν δυνατή η φόρτωση των στοιχείων της φόρμας."),
-      )
+      .catch(() => setError('Δεν ήταν δυνατή η φόρτωση των στοιχείων της φόρμας.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -103,25 +91,25 @@ export function NewCommunicationForm() {
     setSuccess(undefined);
 
     if (!values.userId) {
-      setError("Επιλέξτε τον χρήστη που καταγράφει την επικοινωνία.");
+      setError('Επιλέξτε τον χρήστη που καταγράφει την επικοινωνία.');
       return;
     }
-    if (mode === "existing" && !values.companyId) {
-      setError("Επιλέξτε προμηθευτή.");
+    if (mode === 'existing' && !values.companyId) {
+      setError('Επιλέξτε προμηθευτή.');
       return;
     }
-    if (mode === "new" && !values.companyName.trim()) {
-      setError("Συμπληρώστε την επωνυμία του νέου προμηθευτή.");
+    if (mode === 'new' && !values.companyName.trim()) {
+      setError('Συμπληρώστε την επωνυμία του νέου προμηθευτή.');
       return;
     }
 
     setSubmitting(true);
     try {
-      await apiFetch("/communications", {
-        method: "POST",
+      await apiFetch('/communications', {
+        method: 'POST',
         body: JSON.stringify({
           userId: values.userId,
-          ...(mode === "existing"
+          ...(mode === 'existing'
             ? { companyId: values.companyId }
             : {
                 company: {
@@ -133,9 +121,7 @@ export function NewCommunicationForm() {
           contactName: values.contactName || undefined,
           contactRole: values.contactRole || undefined,
           outcome: values.outcome || undefined,
-          interestLevel: values.interestLevel
-            ? Number(values.interestLevel)
-            : undefined,
+          interestLevel: values.interestLevel ? Number(values.interestLevel) : undefined,
           notes: values.notes || undefined,
           nextAction: values.nextAction || undefined,
           nextActionAt: values.nextActionAt
@@ -144,13 +130,13 @@ export function NewCommunicationForm() {
         }),
       });
       setValues((current) => ({ ...emptyValues, userId: current.userId }));
-      setMode("existing");
-      setSuccess("Η επικοινωνία καταγράφηκε.");
+      setMode('existing');
+      setSuccess('Η επικοινωνία καταγράφηκε.');
     } catch (caught) {
       setError(
         caught instanceof ApiError
           ? caught.message
-          : "Δεν ήταν δυνατή η αποθήκευση της επικοινωνίας.",
+          : 'Δεν ήταν δυνατή η αποθήκευση της επικοινωνίας.',
       );
     } finally {
       setSubmitting(false);
@@ -171,8 +157,8 @@ export function NewCommunicationForm() {
             <input
               type="radio"
               name="company-mode"
-              checked={mode === "existing"}
-              onChange={() => setMode("existing")}
+              checked={mode === 'existing'}
+              onChange={() => setMode('existing')}
             />
             Υπάρχων προμηθευτής
           </label>
@@ -180,19 +166,19 @@ export function NewCommunicationForm() {
             <input
               type="radio"
               name="company-mode"
-              checked={mode === "new"}
-              onChange={() => setMode("new")}
+              checked={mode === 'new'}
+              onChange={() => setMode('new')}
             />
             Νέος προμηθευτής
           </label>
         </div>
-        {mode === "existing" ? (
+        {mode === 'existing' ? (
           <Field label="Προμηθευτής">
             <select
               required
               disabled={loading}
               value={values.companyId}
-              onChange={(event) => update("companyId", event.target.value)}
+              onChange={(event) => update('companyId', event.target.value)}
               className={controlClass}
             >
               <option value="">Επιλέξτε προμηθευτή</option>
@@ -210,9 +196,7 @@ export function NewCommunicationForm() {
                 <input
                   required
                   value={values.companyName}
-                  onChange={(event) =>
-                    update("companyName", event.target.value)
-                  }
+                  onChange={(event) => update('companyName', event.target.value)}
                   className={controlClass}
                   placeholder="π.χ. ΑΒΓ ΕΠΕ"
                 />
@@ -222,14 +206,14 @@ export function NewCommunicationForm() {
               <input
                 type="email"
                 value={values.companyEmail}
-                onChange={(event) => update("companyEmail", event.target.value)}
+                onChange={(event) => update('companyEmail', event.target.value)}
                 className={controlClass}
               />
             </Field>
             <Field label="Τηλέφωνο">
               <input
                 value={values.companyPhone}
-                onChange={(event) => update("companyPhone", event.target.value)}
+                onChange={(event) => update('companyPhone', event.target.value)}
                 className={controlClass}
               />
             </Field>
@@ -250,7 +234,7 @@ export function NewCommunicationForm() {
               required
               disabled={loading || users.length === 0}
               value={values.userId}
-              onChange={(event) => update("userId", event.target.value)}
+              onChange={(event) => update('userId', event.target.value)}
               className={controlClass}
             >
               <option value="">Επιλέξτε χρήστη</option>
@@ -264,7 +248,7 @@ export function NewCommunicationForm() {
           <Field label="Αποτέλεσμα">
             <select
               value={values.outcome}
-              onChange={(event) => update("outcome", event.target.value)}
+              onChange={(event) => update('outcome', event.target.value)}
               className={controlClass}
             >
               <option value="">Δεν έχει οριστεί</option>
@@ -277,21 +261,21 @@ export function NewCommunicationForm() {
           <Field label="Όνομα επαφής">
             <input
               value={values.contactName}
-              onChange={(event) => update("contactName", event.target.value)}
+              onChange={(event) => update('contactName', event.target.value)}
               className={controlClass}
             />
           </Field>
           <Field label="Ρόλος επαφής">
             <input
               value={values.contactRole}
-              onChange={(event) => update("contactRole", event.target.value)}
+              onChange={(event) => update('contactRole', event.target.value)}
               className={controlClass}
             />
           </Field>
           <Field label="Επίπεδο ενδιαφέροντος">
             <select
               value={values.interestLevel}
-              onChange={(event) => update("interestLevel", event.target.value)}
+              onChange={(event) => update('interestLevel', event.target.value)}
               className={controlClass}
             >
               <option value="">Δεν έχει οριστεί</option>
@@ -306,7 +290,7 @@ export function NewCommunicationForm() {
             <input
               type="datetime-local"
               value={values.nextActionAt}
-              onChange={(event) => update("nextActionAt", event.target.value)}
+              onChange={(event) => update('nextActionAt', event.target.value)}
               className={controlClass}
             />
           </Field>
@@ -314,7 +298,7 @@ export function NewCommunicationForm() {
             <Field label="Επόμενη ενέργεια">
               <input
                 value={values.nextAction}
-                onChange={(event) => update("nextAction", event.target.value)}
+                onChange={(event) => update('nextAction', event.target.value)}
                 className={controlClass}
                 placeholder="π.χ. Αποστολή καταλόγου τιμών"
               />
@@ -324,7 +308,7 @@ export function NewCommunicationForm() {
             <Field label="Σημειώσεις">
               <textarea
                 value={values.notes}
-                onChange={(event) => update("notes", event.target.value)}
+                onChange={(event) => update('notes', event.target.value)}
                 className={`${controlClass} min-h-28 resize-y`}
               />
             </Field>
@@ -348,11 +332,8 @@ export function NewCommunicationForm() {
         </p>
       ) : null}
       <div className="flex justify-end">
-        <Button
-          type="submit"
-          disabled={loading || submitting || users.length === 0}
-        >
-          {submitting ? "Αποθήκευση…" : "Καταχώριση επικοινωνίας"}
+        <Button type="submit" disabled={loading || submitting || users.length === 0}>
+          {submitting ? 'Αποθήκευση…' : 'Καταχώριση επικοινωνίας'}
         </Button>
       </div>
     </form>
