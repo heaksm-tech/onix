@@ -11,7 +11,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     },
 
     company_id: {
-      type: 'uuid',
+      type: 'bigint',
       notNull: true,
       references: 'companies',
       onDelete: 'RESTRICT',
