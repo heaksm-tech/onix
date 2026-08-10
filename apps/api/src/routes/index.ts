@@ -1,11 +1,10 @@
-import { Router } from 'express';
+import { Router } from "express";
 
-import { healthRouter } from './health.js';
+import { communicationsRouter } from "../modules/communications/router.js";
+import { healthRouter } from "./health.js";
 
-/**
- * Root of the v1 API. Mount feature routers from `src/modules/<feature>` here,
- * e.g. `router.use('/companies', companiesRouter)`.
- */
+/** Root of the v1 API. */
 export const apiRouter: Router = Router();
 
 apiRouter.use(healthRouter);
+apiRouter.use(communicationsRouter);
