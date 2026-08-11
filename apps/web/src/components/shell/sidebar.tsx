@@ -6,8 +6,10 @@ import { useState } from 'react';
 
 import { IconChevronRight } from '@/components/icons';
 import { LogoMark } from '@/components/logo';
+import { UserCard } from '@/components/shell/user-card';
 import { cn } from '@/lib/cn';
 import { NAV_ITEMS, isActive, type NavGroupItem, type NavItem, type NavLeafItem } from '@/lib/nav';
+import type { AuthUser } from '@/lib/session';
 
 function NavLeaf({ item, pathname }: { item: NavLeafItem; pathname: string }) {
   const Icon = item.icon;
@@ -118,7 +120,7 @@ function NavEntry({ item, pathname }: { item: NavItem; pathname: string }) {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ user }: { user: AuthUser }) {
   const pathname = usePathname();
 
   return (
@@ -147,15 +149,7 @@ export function Sidebar() {
 
       <div className="flex flex-col px-3 pb-4">
         <div className="mx-2.5 mb-2 border-t border-line" />
-        <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent to-accent-strong text-xs font-semibold text-white">
-            ΣΜ
-          </span>
-          <span className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate text-sm font-medium">Admin User</span>
-            <span className="truncate text-[11px] text-ink-faint">Διαχειριστής</span>
-          </span>
-        </div>
+        <UserCard user={user} />
       </div>
     </aside>
   );

@@ -1,10 +1,11 @@
 'use client';
 
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 
 import { ApiError, apiFetch } from '@/lib/api';
 import { Button } from './button';
 import { Card } from './card';
+import { Field, controlClass } from './field';
 
 type Company = {
   id: string;
@@ -43,20 +44,6 @@ const emptyValues: FormValues = {
   nextAction: '',
   nextActionAt: '',
 };
-
-const controlClass =
-  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-card outline-none transition-colors placeholder:text-ink-faint focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-60';
-const labelClass = 'mb-1.5 block text-sm font-medium text-ink';
-
-function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
-  return (
-    <label className="block">
-      <span className={labelClass}>{label}</span>
-      {children}
-      {hint ? <span className="mt-1 block text-xs text-ink-faint">{hint}</span> : null}
-    </label>
-  );
-}
 
 export function NewCommunicationForm() {
   const [values, setValues] = useState<FormValues>(emptyValues);

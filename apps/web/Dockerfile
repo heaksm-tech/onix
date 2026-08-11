@@ -17,10 +17,8 @@ CMD ["npm", "run", "dev"]
 
 # --- build ------------------------------------------------------------------
 FROM deps AS build
-# NEXT_PUBLIC_* is inlined into the client bundle at build time, so it has to
-# be present here rather than at runtime.
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# No NEXT_PUBLIC_* build args: the API's address is read at runtime from
+# API_URL, server-side only, and never inlined into the client bundle.
 ENV NODE_ENV=production
 COPY . .
 RUN npm run build

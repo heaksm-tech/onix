@@ -138,6 +138,11 @@ rounded-xl`). Everything card-like uses it.
   `action`. Every page starts with it.
 - **`EmptyState`** — icon + title + description inside a `Card`. The standard
   body for not-yet-built or zero-data states.
+- **`Field` / `controlClass`** (`field.tsx`) — the form contract. `Field` is a
+  labelled row (label above, optional hint below); `controlClass` carries the
+  input styling and goes on native `input`, `select` and `textarea` alike.
+  There is no styled input component — the native elements already behave, they
+  only need the tokens. Never re-declare that class string in a form.
 - **`icons.tsx`** — hand-rolled 24×24 stroke icons (`stroke-width 1.75`, round
   caps/joins, Lucide-style geometry). New icons are added here following the
   same recipe; **never install an icon package**. Default rendered sizes:
@@ -186,6 +191,13 @@ src/app/(app)/<section>/page.tsx
 src/app/(app)/<section>/<sub-page>/page.tsx
 ```
 
+`(app)` means **signed in**. Its layout resolves the current user and redirects
+to `/login` when there is none, so every page inside it can assume a session.
+Screens that exist _before_ sign-in live in `(auth)` instead — they render on a
+bare canvas with no sidebar or topbar, and they are the only pages allowed to
+do so. Route groups do not appear in the URL: `(auth)/login/page.tsx` is
+`/login`.
+
 ### Recipe: adding a section
 
 1. Add the icon to `icons.tsx` (if needed, same stroke recipe).
@@ -200,12 +212,50 @@ src/app/(app)/<section>/<sub-page>/page.tsx
 ## 9. Data & API conventions (web side)
 
 - Talk to the Express API only through `apiFetch` in `src/lib/api.ts`
-  (typed errors via `ApiError`; server components use `API_URL`, browser code
-  uses `NEXT_PUBLIC_API_URL`).
+  (typed errors via `ApiError`). Server components reach Express directly via
+  `API_URL`; browser code goes to this app's own `/api/v1/*` route, which
+  forwards on. See the auth notes below for why that distinction matters.
 - Async server components that fetch should be wrapped in `<Suspense>` with a
   quiet Greek fallback, so pages never block on the API.
 - Status indication: small `positive`/`negative` dot + short Greek text (see
   `api-status.tsx` for the pattern).
+
+### Auth
+
+- **The browser never talks to the API directly.** `apiFetch` posts to this
+  app's own `/api/v1/*` route, which forwards to Express. There is no
+  `NEXT_PUBLIC_API_URL`; the API's address is server-side only. Keep it that
+  way — a browser-visible API URL undoes the lockdown below.
+- The session is an httpOnly cookie issued by Express and relayed by that
+  route, so it is first-party to the web origin. Same-origin requests carry it
+  automatically; a 401 means the session is gone.
+- Server components read the user through `getCurrentUser()` in `lib/auth.ts`.
+  That module imports `next/headers` and is therefore server-only — client
+  components take the user as a prop and import the shared `AuthUser` type,
+  `ROLE_LABELS` and `initials()` from `lib/session.ts`.
+- Role labels are Greek and live in one place (`ROLE_LABELS`). Never spell a
+  role out in JSX.
+
+### The anonymous perimeter
+
+`proxy.ts` serves a visitor without a session exactly two things: the login
+document and the endpoint it posts to. Pages redirect to `/login`; everything
+else — API routes, RSC payloads, **and every JavaScript chunk** — gets a flat 404. The bundles name every endpoint and screen the app has, so handing them to
+an anonymous visitor hands over a map of the API.
+
+That works only because **the login page ships no JavaScript**:
+
+- `login-form.tsx` is a server component rendering a native
+  `<form method="post">`. It must stay that way. Adding `'use client'` anywhere
+  under `/login` leaves the page rendering but never hydrating.
+- Its CSS is inlined via `experimental.inlineCss`, so the document is
+  self-contained in production.
+- A failed sign-in is a redirect carrying an error **code**, mapped to Greek
+  copy by `loginErrorMessage()`. Never put an API message in the URL.
+
+Stylesheets are the one carve-out — they expose no endpoint, and the login page
+already inlines the same rules. If you add a section, nothing here needs
+touching: `(app)` pages and their chunks are covered by default.
 
 ---
 

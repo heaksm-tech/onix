@@ -15,7 +15,15 @@ export function createApp(): Express {
   app.set('trust proxy', 1);
 
   app.use(helmet());
-  app.use(cors({ origin: env.corsOrigins, credentials: true }));
+
+  // Only mounted when an origin is actually configured. With no CORS headers
+  // at all, a browser cannot read a response from this API on behalf of
+  // another site — which is the intended state, since the web app talks to the
+  // API from the server side.
+  if (env.corsOrigins.length > 0) {
+    app.use(cors({ origin: env.corsOrigins, credentials: true }));
+  }
+
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/v1/health' } }));

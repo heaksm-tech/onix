@@ -31,6 +31,8 @@
     "format:check": "npm --prefix apps/api run format:check && npm --prefix apps/web run format:check",
     "test": "npm --prefix apps/api run test",
     "db:setup": "npm --prefix apps/api run db:setup",
+    "user:create": "npm --prefix apps/api run user:create --",
+    "db:seed": "npm --prefix apps/api run db:seed",
     "migrate": "npm --prefix apps/api run migrate --",
     "migrate:up": "npm --prefix apps/api run migrate:up",
     "migrate:down": "npm --prefix apps/api run migrate:down",

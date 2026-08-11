@@ -129,6 +129,7 @@ From a fresh clone:
 ```bash
 npm install
 npm run setup
+npm run db:seed
 npm run dev
 ```
 
@@ -137,6 +138,7 @@ That is the whole setup.
 - `npm install` fetches the small root launcher.
 - `npm run setup` creates the env files, installs both apps, creates the
   `onix_dev` and `onix_test` databases, and applies all migrations.
+- `npm run db:seed` creates the development sign-in below.
 - `npm run dev` starts both apps together with hot reload.
 
 | Service | URL                                 |
@@ -145,12 +147,83 @@ That is the whole setup.
 | API     | http://localhost:4000/api/v1        |
 | Health  | http://localhost:4000/api/v1/health |
 
-Open http://localhost:3000. The home page shows a live API/database status
-indicator — **green means the whole chain works**. If it is red, see
-troubleshooting below.
+Open http://localhost:3000. The app requires a sign-in, so you land on
+http://localhost:3000/login.
 
 `npm run setup` is safe to re-run at any time. It never overwrites an existing
 `.env` and never drops a database.
+
+---
+
+## 2a. Accounts and sign-in
+
+The CRM is sign-in only — there is no registration page. Accounts are created
+from the command line.
+
+**For development**, seed the throwaway administrator:
+
+```bash
+npm run db:seed
+```
+
+| Field    | Value            |
+| -------- | ---------------- |
+| Email    | `admin@test.com` |
+| Password | `123456`         |
+
+Re-running updates that account rather than duplicating it. The script refuses
+to run with `NODE_ENV=production` — those credentials are for a laptop and
+nowhere else.
+
+**For a real account**, use the interactive script. It prompts for the password
+(never taken from a flag, so it stays out of your shell history) and requires
+at least 12 characters:
+
+```bash
+npm run user:create
+```
+
+Everything it does not get as a flag it asks for:
+
+```bash
+npm run user:create -- --email anna@melas.gr --name "Άννα Μελά" --role admin
+```
+
+Roles are `employee`, `manager`, `technical`, `admin`. Running it against an
+existing email sets a new password for that account and reactivates it.
+
+Sessions are rows in the `sessions` table, referenced by an httpOnly cookie, so
+signing out or deactivating a user takes effect on the next request. They last
+`SESSION_TTL_DAYS` (14 by default).
+
+### What an unauthenticated visitor can reach
+
+Nothing but the login screen. Signing in is the gate for the application code
+itself, not only for its data:
+
+| Request                          | Without a session                |
+| -------------------------------- | -------------------------------- |
+| `/`, `/suppliers/*`, any page    | redirect to `/login`             |
+| RSC payloads for those pages     | redirect, no content             |
+| `/_next/static/**` JavaScript    | `404`                            |
+| `/api/v1/*` (including unknown paths) | `404`                       |
+| `/login`, its form, the icon     | served                           |
+| Stylesheets                      | served — no endpoints in them     |
+
+The client bundles name every endpoint the app calls, so they are withheld from
+anyone who has not signed in. Two design consequences follow, and both matter
+if you change this area:
+
+- **The login page ships no JavaScript.** Its form is plain HTML and its CSS is
+  inlined into the document. Adding a client component to it would leave the
+  page rendering but not working.
+- **The browser never addresses the API.** It calls this app's own `/api/v1/*`
+  route, which forwards to Express; the API's address is server-side only.
+  There is no `NEXT_PUBLIC_API_URL` to set, and `docker-compose.prod.yml` does
+  not publish the API's port at all.
+
+In development the login page does not hot-reload while you are signed out —
+its scripts are blocked like everything else. Sign in and it behaves normally.
 
 ---
 
@@ -177,8 +250,8 @@ you skipped the `createuser` step above.
 **`role "yourname" does not exist`** — you skipped the Linux `createuser` step.
 
 **`Port 3000 is already in use`** (or 4000) — something else is running. Find and
-stop it, or change `PORT` in `apps/api/.env` and `API_URL` / `NEXT_PUBLIC_API_URL`
-in `apps/web/.env.local` to match.
+stop it, or change `PORT` in `apps/api/.env` and `API_URL` in
+`apps/web/.env.local` to match.
 
 **`Unsupported engine` or syntax errors on startup** — your Node is older than 22.
 Check with `node --version`.
@@ -199,7 +272,7 @@ page — and it is live in about a second.
 | Any file under `src/`          | nothing — auto-reloads |
 | Dependencies in a package.json | `npm run install:all`  |
 | `apps/api/.env`                | restart `npm run dev`  |
-| `NEXT_PUBLIC_*`                | restart `npm run dev`  |
+| `apps/web/.env.local`          | restart `npm run dev`  |
 | Added a migration              | `npm run migrate:up`   |
 
 ## Commands
@@ -221,6 +294,8 @@ npm run format         # prettier, both apps
 
 npm run install:all    # reinstall both apps' dependencies
 npm run db:setup       # create the dev and test databases
+npm run db:seed        # create the admin@test.com development sign-in
+npm run user:create    # create a real account, or reset someone's password
 ```
 
 You can also work inside a single app — `cd apps/api && npm run dev` behaves
@@ -240,11 +315,11 @@ The baseline migration installs `pgcrypto` (for `gen_random_uuid()`) and a share
 `set_updated_at()` trigger function. Attach it to any table with a timestamp:
 
 ```ts
-pgm.createTrigger('follow_ups', 'set_updated_at', {
-  when: 'BEFORE',
-  operation: 'UPDATE',
-  level: 'ROW',
-  function: 'set_updated_at',
+pgm.createTrigger("follow_ups", "set_updated_at", {
+  when: "BEFORE",
+  operation: "UPDATE",
+  level: "ROW",
+  function: "set_updated_at",
 });
 ```
 
@@ -305,8 +380,9 @@ Two files, both gitignored, both created by `npm run setup` from a committed
 - `apps/api/.env` — `DATABASE_URL`, `PORT`, `LOG_LEVEL`, `CORS_ORIGIN`. Validated
   at boot with zod, so a bad value fails immediately with a readable message
   rather than at the first request.
-- `apps/web/.env.local` — `API_URL` for server components and
-  `NEXT_PUBLIC_API_URL` for browser code. The latter is inlined at build time.
+- `apps/web/.env.local` — `API_URL`, and nothing else. It is read server-side
+  only; browser code calls the web app's own `/api/v1` route, so the API's
+  address is never inlined into the client bundle.
 
 ## Editor setup
 

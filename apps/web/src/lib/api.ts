@@ -1,13 +1,14 @@
+import { BROWSER_API_PATH, SERVER_API_URL } from './api-url';
+
 /**
  * Thin wrapper around fetch for talking to the Express API.
  *
- * Server components use `API_URL`; browser code falls back to
- * `NEXT_PUBLIC_API_URL`, which must be inlined at build time.
+ * Server components call Express directly; browser code goes through this
+ * app's own `/api/v1/*` route, which forwards on. Nothing here needs a
+ * `NEXT_PUBLIC_*` value, so the API's address is never baked into the client
+ * bundle.
  */
-const BASE_URL =
-  (typeof window === 'undefined' ? process.env.API_URL : undefined) ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  'http://localhost:4000/api/v1';
+const BASE_URL = typeof window === 'undefined' ? SERVER_API_URL : BROWSER_API_PATH;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -26,6 +27,10 @@ type ErrorBody = { error?: { code?: string; message?: string } };
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
+    // Browser calls are same-origin now, so the session cookie rides along on
+    // its own. Server components have no cookie jar and pass theirs as a
+    // header instead — see `getCurrentUser` in `lib/auth.ts`.
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
       ...init.headers,
