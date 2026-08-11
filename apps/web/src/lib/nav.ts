@@ -1,7 +1,7 @@
 import type { Route } from 'next';
 import type { ComponentType } from 'react';
 
-import { IconDashboard, IconSuppliers, type IconProps } from '@/components/icons';
+import { IconCompanies, IconDashboard, type IconProps } from '@/components/icons';
 
 export type NavSubItem = {
   label: string;
@@ -25,9 +25,9 @@ export type NavItem = NavLeafItem | NavGroupItem;
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/', icon: IconDashboard },
   {
-    label: 'Προμηθευτές',
-    icon: IconSuppliers,
-    children: [{ label: 'Νέα επικοινωνία', href: '/suppliers/new-communication' }],
+    label: 'Εταιρείες - Συνεργασίες',
+    icon: IconCompanies,
+    children: [{ label: 'Νέα επικοινωνία', href: '/companies/new-communication' }],
   },
 ];
 

@@ -203,7 +203,7 @@ itself, not only for its data:
 
 | Request                          | Without a session                |
 | -------------------------------- | -------------------------------- |
-| `/`, `/suppliers/*`, any page    | redirect to `/login`             |
+| `/`, `/companies/*`, any page    | redirect to `/login`             |
 | RSC payloads for those pages     | redirect, no content             |
 | `/_next/static/**` JavaScript    | `404`                            |
 | `/api/v1/*` (including unknown paths) | `404`                       |

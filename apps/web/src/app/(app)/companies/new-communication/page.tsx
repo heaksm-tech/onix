@@ -10,7 +10,7 @@ export default function NewCommunicationPage() {
     <>
       <PageHeader
         title="Νέα επικοινωνία"
-        description="Καταγραφή επικοινωνίας με πιθανό προμηθευτή."
+        description="Καταγραφή επικοινωνίας με εταιρεία για πιθανή συνεργασία."
       />
       <NewCommunicationForm />
     </>

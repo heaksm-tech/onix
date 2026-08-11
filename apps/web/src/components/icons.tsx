@@ -35,7 +35,7 @@ export function IconDashboard(props: IconProps) {
   );
 }
 
-export function IconSuppliers(props: IconProps) {
+export function IconCompanies(props: IconProps) {
   return (
     <Base {...props}>
       <path d="M3 21h18" />
