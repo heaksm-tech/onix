@@ -18,6 +18,8 @@ tokens, components, navigation model, and the Greek-first language rules.
 ## 1. Install the prerequisites
 
 You need two things: **Node.js 22+** and **PostgreSQL 14+**. Jump to your platform.
+Running the stack in containers instead? Skip to [Run with Docker](#run-with-docker),
+which needs neither.
 
 Node 22 is a hard minimum — the API uses Node's built-in `--env-file` support,
 which does not exist in Node 20.
@@ -390,10 +392,52 @@ Install the **ESLint** and **Prettier** extensions for your editor. Both apps sh
 their own config, and running `npm run install:all` gives your editor the local
 type definitions it needs for IntelliSense.
 
-## A note on the Docker files
+## Run with Docker
 
-`docker-compose.yml` and the `Dockerfile`s are still in the repository; they are
-used by the `main` branch and for production deployment. **You do not need Docker
-for anything in this guide.** The npm scripts above run against your local Node
-and PostgreSQL, and the two paths do not interfere — env files are excluded from
-Docker images precisely so the same scripts work in both.
+Everything above runs against your own Node and PostgreSQL. The containerised
+stack is the alternative, and it needs neither installed — only Docker. The two
+paths do not interfere: env files are excluded from the images, so the same npm
+scripts work in both.
+
+```bash
+docker compose up --build
+```
+
+That starts PostgreSQL, applies pending migrations, and runs both apps with hot
+reload against the bind-mounted source. Same URLs as the table in section 2.
+
+The CRM is sign-in only and a fresh database has no accounts, so create one in
+the API container — the scripts from section 2a, unchanged:
+
+```bash
+docker compose exec api npm run db:seed
+```
+
+That is the throwaway `admin@test.com` / `123456` account. For a real one,
+`docker compose exec api npm run user:create` prompts the same way it does on
+the host.
+
+Ports and credentials come from a root `.env` if you have one — copy
+`.env.example` over it. Without one, compose falls back to the defaults written
+in that same file. `docker compose down` stops the stack and keeps the
+database; `-v` on the end deletes it.
+
+### Production stack
+
+`docker-compose.prod.yml` builds compiled images, runs the migrations as a
+one-shot service that must succeed before the API starts, and publishes only
+the web app — the API is reachable over the compose network alone. Here
+`POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB` are required rather than
+defaulted, so the `.env` is not optional:
+
+```bash
+cp .env.example .env   # then edit the POSTGRES_* values
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Set `SESSION_COOKIE_SECURE=false` if the browser reaches the web app over plain
+HTTP, or it discards the session cookie and signing in appears to do nothing.
+
+The runtime image carries `dist/` and the migrations, not the account scripts —
+create accounts from the development stack above, or point one at the
+production database.
