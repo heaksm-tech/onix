@@ -1,26 +1,21 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Fragment } from 'react';
 
 import { IconBell, IconSearch } from '@/components/icons';
-import { LogoMark } from '@/components/logo';
+import { MobileNav } from '@/components/shell/mobile-nav';
 import { cn } from '@/lib/cn';
 import { breadcrumbTrail } from '@/lib/nav';
+import type { AuthUser } from '@/lib/session';
 
-export function Topbar() {
+export function Topbar({ user }: { user: AuthUser }) {
   const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-line bg-canvas/80 px-4 backdrop-blur-sm lg:px-8">
-      {/* Compact logo fallback while the sidebar is hidden on small screens. */}
-      <Link
-        href="/"
-        className="grid size-8 place-items-center rounded-lg bg-ink text-canvas md:hidden"
-      >
-        <LogoMark className="size-[18px]" />
-      </Link>
+      {/* Stands in for the sidebar while it is hidden on small screens. */}
+      <MobileNav user={user} />
 
       <nav aria-label="Διαδρομή" className="flex min-w-0 items-center gap-1.5 text-sm">
         <span className="hidden text-ink-faint sm:inline">Workspace</span>

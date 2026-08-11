@@ -141,6 +141,25 @@ export function IconLogout(props: IconProps) {
   );
 }
 
+export function IconMenu(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </Base>
+  );
+}
+
+export function IconClose(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M6 6l12 12" />
+      <path d="M18 6 6 18" />
+    </Base>
+  );
+}
+
 export function IconActivity(props: IconProps) {
   return (
     <Base {...props}>
