@@ -43,18 +43,54 @@ function isStylesheet(pathname: string): boolean {
   return pathname.startsWith('/_next/') && pathname.endsWith('.css');
 }
 
+/**
+ * Tie a cookie-gated response to the cookie that produced it.
+ *
+ * Every path this file guards answers two ways — the real thing with a
+ * session, a 404 without — and nothing in the response used to say so. That
+ * let any cache keep one answer and replay it to the wrong visitor: a stored
+ * 404 leaves a signed-in browser holding HTML that renders but never hydrates,
+ * so the page looks correct and no button responds to a tap; a stored chunk
+ * hands an anonymous visitor the very bundle this file exists to withhold.
+ *
+ * Next sets `Vary: Accept-Encoding` on static assets itself, and a header set
+ * here replaces rather than merges with it, so both names are listed.
+ */
+function varyOnSession(response: NextResponse): NextResponse {
+  response.headers.set('Vary', 'Accept-Encoding, Cookie');
+  return response;
+}
+
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (PUBLIC_PATHS.has(pathname) || PUBLIC_FILES.has(pathname)) return NextResponse.next();
   if (isStylesheet(pathname)) return NextResponse.next();
-  if (request.cookies.get(SESSION_COOKIE)) return NextResponse.next();
+
+  if (request.cookies.get(SESSION_COOKIE)) {
+    if (!pathname.startsWith('/_next/')) return NextResponse.next();
+
+    const response = varyOnSession(NextResponse.next());
+    // Chunk names are content-hashed, so the year Next attaches is right;
+    // `public` is not. It invites the reverse proxy in front of this app to
+    // hold one visitor's copy and hand it to callers carrying no session.
+    // `private` keeps the lifetime and confines the copy to the browser that
+    // signed in for it.
+    if (pathname.startsWith('/_next/static/')) {
+      response.headers.set('Cache-Control', 'private, max-age=31536000, immutable');
+    }
+    return response;
+  }
 
   // Assets and data get a flat 404 rather than a redirect: an HTML login page
   // is not a useful answer to a request for a script, and 404 discloses less
   // than 403 about what is there.
   if (pathname.startsWith('/_next/') || pathname.startsWith('/api/')) {
-    return new NextResponse(null, { status: 404 });
+    const response = varyOnSession(new NextResponse(null, { status: 404 }));
+    // A denial is never worth storing: this exact URL turns into a 200 the
+    // moment the visitor signs in, and a cached 404 would outlive that.
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
   }
 
   const url = request.nextUrl.clone();
