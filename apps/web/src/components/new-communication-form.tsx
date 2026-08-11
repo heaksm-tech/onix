@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useState } from 'react';
 
 import { ApiError, apiFetch } from '@/lib/api';
+import { OUTCOMES, OUTCOME_LABELS } from '@/lib/communications';
 import { Button } from './button';
 import { Card } from './card';
 import { Field, controlClass } from './field';
@@ -47,7 +48,7 @@ const emptyValues: FormValues = {
 
 export function NewCommunicationForm() {
   const [values, setValues] = useState<FormValues>(emptyValues);
-  const [mode, setMode] = useState<'existing' | 'new'>('existing');
+  const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [companies, setCompanies] = useState<Company[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,11 +83,15 @@ export function NewCommunicationForm() {
       return;
     }
     if (mode === 'existing' && !values.companyId) {
-      setError('Επιλέξτε προμηθευτή.');
+      setError('Επιλέξτε εταιρεία.');
       return;
     }
     if (mode === 'new' && !values.companyName.trim()) {
-      setError('Συμπληρώστε την επωνυμία του νέου προμηθευτή.');
+      setError('Συμπληρώστε την επωνυμία της νέας εταιρείας.');
+      return;
+    }
+    if (mode === 'new' && !values.companyPhone.trim()) {
+      setError('Συμπληρώστε το τηλέφωνο της νέας εταιρείας.');
       return;
     }
 
@@ -102,7 +107,7 @@ export function NewCommunicationForm() {
                 company: {
                   name: values.companyName,
                   email: values.companyEmail || undefined,
-                  phone: values.companyPhone || undefined,
+                  phone: values.companyPhone,
                 },
               }),
           contactName: values.contactName || undefined,
@@ -117,7 +122,7 @@ export function NewCommunicationForm() {
         }),
       });
       setValues((current) => ({ ...emptyValues, userId: current.userId }));
-      setMode('existing');
+      setMode('new');
       setSuccess('Η επικοινωνία καταγράφηκε.');
     } catch (caught) {
       setError(
@@ -134,9 +139,9 @@ export function NewCommunicationForm() {
     <form onSubmit={submit} className="max-w-4xl space-y-4">
       <Card className="p-5">
         <div className="mb-5">
-          <h2 className="text-sm font-semibold">Προμηθευτής</h2>
+          <h2 className="text-sm font-semibold">Εταιρεία</h2>
           <p className="mt-1 text-sm text-ink-secondary">
-            Επιλέξτε υπάρχοντα προμηθευτή ή δημιουργήστε νέο.
+            Δημιουργήστε νέα εταιρεία ή επιλέξτε υπάρχουσα.
           </p>
         </div>
         <div className="mb-5 flex gap-4 border-b border-line">
@@ -144,39 +149,22 @@ export function NewCommunicationForm() {
             <input
               type="radio"
               name="company-mode"
-              checked={mode === 'existing'}
-              onChange={() => setMode('existing')}
+              checked={mode === 'new'}
+              onChange={() => setMode('new')}
             />
-            Υπάρχων προμηθευτής
+            Νέα εταιρεία
           </label>
           <label className="flex items-center gap-2 pb-3 text-sm text-ink">
             <input
               type="radio"
               name="company-mode"
-              checked={mode === 'new'}
-              onChange={() => setMode('new')}
+              checked={mode === 'existing'}
+              onChange={() => setMode('existing')}
             />
-            Νέος προμηθευτής
+            Υπάρχουσα εταιρεία
           </label>
         </div>
-        {mode === 'existing' ? (
-          <Field label="Προμηθευτής">
-            <select
-              required
-              disabled={loading}
-              value={values.companyId}
-              onChange={(event) => update('companyId', event.target.value)}
-              className={controlClass}
-            >
-              <option value="">Επιλέξτε προμηθευτή</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        ) : (
+        {mode === 'new' ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Field label="Επωνυμία">
@@ -199,12 +187,30 @@ export function NewCommunicationForm() {
             </Field>
             <Field label="Τηλέφωνο">
               <input
+                required
                 value={values.companyPhone}
                 onChange={(event) => update('companyPhone', event.target.value)}
                 className={controlClass}
               />
             </Field>
           </div>
+        ) : (
+          <Field label="Εταιρεία">
+            <select
+              required
+              disabled={loading}
+              value={values.companyId}
+              onChange={(event) => update('companyId', event.target.value)}
+              className={controlClass}
+            >
+              <option value="">Επιλέξτε εταιρεία</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </Field>
         )}
       </Card>
 
@@ -239,10 +245,11 @@ export function NewCommunicationForm() {
               className={controlClass}
             >
               <option value="">Δεν έχει οριστεί</option>
-              <option value="no_answer">Δεν απάντησε</option>
-              <option value="callback">Επανάκληση</option>
-              <option value="interested">Ενδιαφέρεται</option>
-              <option value="not_interested">Δεν ενδιαφέρεται</option>
+              {OUTCOMES.map((outcome) => (
+                <option key={outcome} value={outcome}>
+                  {OUTCOME_LABELS[outcome]}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="Όνομα επαφής">
