@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { query, transaction } from '../../db/index.js';
+import { HttpError } from '../../lib/http-error.js';
 import { validate } from '../../middleware/validate.js';
 
 type Company = {
@@ -29,15 +30,25 @@ const optionalText = (max: number) =>
     .optional()
     .transform((value) => value || undefined);
 
+// Maximum lengths mirror the column widths in `companies`, so an over-long
+// value is a 422 naming the field rather than a 500 from Postgres.
 const companyInput = z.object({
   name: z.string().trim().min(1).max(255),
-  email: optionalText(320),
-  phone: optionalText(50),
+  email: optionalText(255),
+  // NOT NULL in `companies`: a company is reached by phone, so the record is
+  // not useful without one.
+  phone: z.string().trim().min(1).max(30),
 });
 
 const createCommunicationInput = z
   .object({
-    companyId: z.string().uuid().optional(),
+    // `companies.id` is a bigserial, so this arrives as a numeric string —
+    // it is kept as a string all the way to Postgres, which does the widening.
+    companyId: z
+      .string()
+      .trim()
+      .regex(/^[1-9]\d*$/, 'Μη έγκυρο αναγνωριστικό εταιρείας.')
+      .optional(),
     company: companyInput.optional(),
     userId: z.string().uuid(),
     contactName: optionalText(150),
@@ -52,7 +63,7 @@ const createCommunicationInput = z
     if (Boolean(value.companyId) === Boolean(value.company)) {
       context.addIssue({
         code: 'custom',
-        message: 'Επιλέξτε υπάρχοντα προμηθευτή ή συμπληρώστε νέο προμηθευτή.',
+        message: 'Επιλέξτε υπάρχουσα εταιρεία ή συμπληρώστε νέα εταιρεία.',
         path: ['companyId'],
       });
     }
@@ -66,7 +77,7 @@ communicationsRouter.get('/companies', async (_req, res) => {
   const companies = await query<Company>(
     `SELECT id, name, email, phone
        FROM companies
-      WHERE status <> 'inactive'
+      WHERE deleted_at IS NULL
       ORDER BY lower(name)`,
   );
   res.json({ companies });
@@ -97,10 +108,18 @@ communicationsRouter.post(
           `INSERT INTO companies (name, email, phone)
          VALUES ($1, $2, $3)
          RETURNING id`,
-          [input.company.name, input.company.email ?? null, input.company.phone ?? null],
+          [input.company.name, input.company.email ?? null, input.company.phone],
         );
         companyId = company.rows[0]?.id;
         companyCreated = true;
+      } else {
+        // Checked rather than left to the foreign key, so a stale option in the
+        // caller's dropdown reads as "company not found" instead of a 500.
+        const existing = await client.query(
+          `SELECT 1 FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+          [companyId],
+        );
+        if (existing.rowCount === 0) throw HttpError.notFound('Η εταιρεία δεν βρέθηκε.');
       }
 
       if (!companyId) throw new Error('Company id was not resolved');
