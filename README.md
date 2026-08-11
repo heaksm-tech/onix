@@ -439,6 +439,15 @@ docker compose -f docker-compose.prod.yml up -d --build
 Set `SESSION_COOKIE_SECURE=false` if the browser reaches the web app over plain
 HTTP, or it discards the session cookie and signing in appears to do nothing.
 
-The runtime image carries `dist/` and the migrations, not the account scripts —
-create accounts from the development stack above, or point one at the
-production database.
+A fresh deployment has no accounts and every page is behind sign-in, so make
+the first one. The runtime image carries no TypeScript and no dev dependencies,
+so it runs the compiled command rather than the `tsx` one:
+
+```bash
+docker compose -f docker-compose.prod.yml exec api npm run user:create:dist
+```
+
+It prompts exactly as it does on a laptop — `exec` gives it the terminal it
+needs. `db:seed` has no production counterpart on purpose: that account exists
+to save typing on a laptop, and the script refuses to run with
+`NODE_ENV=production`.
