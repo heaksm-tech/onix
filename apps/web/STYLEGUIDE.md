@@ -150,8 +150,13 @@ rounded-xl`). Everything card-like uses it.
 - **`logo.tsx` / `LogoMark`** — the emerald-cut "O" with the accent stone. Band
   uses `currentColor`, stone uses `var(--accent)`. Do not restyle, recolor, or
   redraw; the favicon (`src/app/icon.svg`) must stay visually in sync with it.
-- **Shell** (`src/components/shell/`) — `Sidebar` + `Topbar`; pages never
-  render their own chrome. Breadcrumbs derive automatically from nav.
+- **Shell** (`src/components/shell/`) — `Sidebar` + `Topbar` + `MobileNav`;
+  pages never render their own chrome. Breadcrumbs derive automatically from
+  nav. `NavList` is the nav rows themselves, rendered by both the sidebar and
+  the mobile drawer — add nav behavior there, not in either shell.
+- **Dashboard** (`src/components/dashboard/`) — the report primitives:
+  `StatTile` (one headline number), `ReportCard` (titled panel, optional note
+  opposite the heading) and `ReportEmpty` (quiet in-panel zero state). See §10.
 
 ---
 
@@ -162,7 +167,7 @@ rounded-xl`). Everything card-like uses it.
 - Deliberate English exceptions (keep exactly these): **Dashboard**,
   **Workspace**, the brand **Onix CRM**, the subtitle "S. D. Melas Trading
   Business", technical initialisms (CRM, API, email), and the `⌘K` shortcut.
-- URL slugs are English kebab-case (`/suppliers/new-communication`), Greek
+- URL slugs are English kebab-case (`/companies/new-communication`), Greek
   labels on top via `nav.ts`.
 - Page metadata: Greek `title` per page; the root template appends `· Onix`.
 - Tone: short, factual, no exclamation marks. Empty states say what will live
@@ -183,6 +188,19 @@ both render from it.
   pages. The types enforce this — a group cannot carry an `href`.
 - Active styling: exact page → pill on the leaf/sub-item; section with active
   child → group header gets `text-ink` + accent icon, no pill.
+
+**One nav, two shells.** The rows live in `NavList`; `Sidebar` renders them in
+the permanent column from `md` up, and `MobileNav` renders the same list in a
+drawer below `md`, opened by the topbar's menu button (the only chrome on the
+left at that width — the compact logo moved into the drawer header). The drawer
+stays mounted so it animates both ways: `inert` is what removes it from the tab
+order and the a11y tree while closed, `pointer-events-none` keeps the closed
+backdrop from swallowing taps. It closes on backdrop tap, on `Escape`, on the
+close button and on any navigation — including a tap on the page already open,
+which is why `NavList` takes an `onNavigate` callback rather than relying on
+the pathname changing. Opening moves focus to the close button and locks body
+scroll; closing by any route other than navigation returns focus to the
+trigger.
 
 Routes live under the `(app)` route group so every section inherits the shell:
 
@@ -215,6 +233,11 @@ do so. Route groups do not appear in the URL: `(auth)/login/page.tsx` is
   (typed errors via `ApiError`). Server components reach Express directly via
   `API_URL`; browser code goes to this app's own `/api/v1/*` route, which
   forwards on. See the auth notes below for why that distinction matters.
+- **Server components fetch through `apiFetchAsUser`** (`lib/server-api.ts`),
+  never `apiFetch` on its own: they have no cookie jar, so the session cookie
+  has to be forwarded by hand or every authenticated route answers 401. It
+  defaults to `no-store`. That module is server-only — importing it from a
+  client component is a build error, which is the point.
 - Async server components that fetch should be wrapped in `<Suspense>` with a
   quiet Greek fallback, so pages never block on the API.
 - Status indication: small `positive`/`negative` dot + short Greek text (see
@@ -259,7 +282,50 @@ touching: `(app)` pages and their chunks are covered by default.
 
 ---
 
-## 10. Quick do / don't
+## 10. Reports & metrics
+
+The Dashboard is the reference implementation
+(`src/components/dashboard/`, fed by `GET /communications/summary`).
+
+**Layout.** A report is rows of `grid gap-4`: a `sm:grid-cols-2
+xl:grid-cols-4` band of `StatTile`s first, then `lg:grid-cols-3` rows of
+`ReportCard`s where the wider panel takes `lg:col-span-2`. Cards in a row
+stretch to equal height — a panel that should fill that height (a chart) grows
+via `flex-1`; list panels size to their content.
+
+**Numbers.** Metric figures are `text-2xl font-semibold tracking-tight
+tabular-nums` — the one type size above the page title, and only for a headline
+figure. Every digit anywhere in a report gets `tabular-nums` so columns of
+dates and counts line up.
+
+**Bars and charts.** Built by hand from divs — there is no chart library, and
+none is to be added. Only the data-driven dimension (a bar's width or height)
+is an inline `style`; everything else is tokens. Colour carries meaning through
+the semantic tokens (`positive` / `negative` / `accent` / `ink-faint`), never
+raw hues, and never as the _only_ channel: a state shown in `text-negative`
+(«Εκπρόθεσμη») must also say so in words. A chart gets `role="img"` and a Greek
+`aria-label` summarising it; per-bar detail goes in a `title`.
+
+**Zero is data.** An outcome with no occurrences stays on the list at 0, and a
+day with no activity keeps a hairline tick rather than vanishing — a gap the
+reader can see beats a row that silently disappears between loads.
+
+**Domain vocabulary lives in `lib/`.** Outcome codes are database values;
+their Greek labels and token colours live in `lib/communications.ts`
+(`OUTCOME_LABELS`, `OUTCOME_TONES`), the way roles live in `lib/session.ts`.
+Never spell an outcome out in JSX — the form's select and the report's
+breakdown read from the same map.
+
+**The clock belongs to the database.** Anything time-relative — whether a
+reminder is late, how many days until it is due — is computed in SQL and
+travels with the row. Rendering must stay pure: reading `Date.now()` during
+render is both a lint error and a source of server/browser disagreement.
+Formatting is fixed to `Europe/Athens` in `lib/communications.ts`, so a deploy
+on a UTC host cannot shift what «σήμερα» means for the office.
+
+---
+
+## 11. Quick do / don't
 
 | Do                                                  | Don't                                      |
 | --------------------------------------------------- | ------------------------------------------ |
@@ -271,3 +337,6 @@ touching: `(app)` pages and their chunks are covered by default.
 | Group nav item → submenu only                       | Giving a group its own page/route          |
 | One ink `primary` button per view                   | Accent-colored or multiple primary buttons |
 | `prefers-color-scheme` via tokens                   | `dark:` classes in components              |
+| Hand-built bars, tokens for colour                  | A chart library, or a raw hue per series   |
+| `apiFetchAsUser` in server components               | `apiFetch` without the session cookie      |
+| Time-relative values computed in SQL                | `Date.now()` during render                 |
