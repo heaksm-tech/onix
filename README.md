@@ -349,10 +349,11 @@ onix/
     ├── api/
     │   ├── .env.example
     │   ├── migrations/          # node-pg-migrate, TypeScript
-    │   ├── scripts/             # setup-local-db.ts
+    │   ├── scripts/             # setup-local-db.ts, seed-user.ts — laptop only
     │   └── src/
     │       ├── index.ts         # entrypoint, graceful shutdown
     │       ├── app.ts           # express app assembly
+    │       ├── cli/             # create-user.ts — compiled, so it ships in the image
     │       ├── config/          # env validation (zod), logger (pino)
     │       ├── db/              # pool, query/queryOne/transaction helpers
     │       ├── lib/             # HttpError
