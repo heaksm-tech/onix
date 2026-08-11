@@ -1,7 +1,7 @@
 /**
  * Creates a user account, or sets the password of an existing one.
  *
- * There is no self-registration: this script is how accounts come into
+ * There is no self-registration: this command is how accounts come into
  * existence. Run it from `apps/api`, or via `npm run user:create` at the
  * repository root.
  *
@@ -11,13 +11,21 @@
  * Anything not passed as a flag is prompted for. The password is always
  * prompted — never taken from a flag — so it stays out of shell history and
  * process listings.
+ *
+ * It lives under `src/` rather than in `scripts/` because it is compiled into
+ * `dist/` along with everything else, which is what puts it inside the
+ * production image: a fresh deployment has no accounts and the whole CRM is
+ * behind sign-in, so `npm run user:create:dist` has to work in a container
+ * that carries no TypeScript source and no dev dependencies. The laptop-only
+ * tools in `scripts/` have no such requirement.
  */
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
 
-import { closePool, queryOne } from '../src/db/index.js';
-import { hashPassword } from '../src/modules/auth/password.js';
-import { USER_ROLES, type UserRole } from '../src/modules/auth/types.js';
+import { env } from '../config/env.js';
+import { closePool, queryOne } from '../db/index.js';
+import { hashPassword } from '../modules/auth/password.js';
+import { USER_ROLES, type UserRole } from '../modules/auth/types.js';
 
 const MIN_PASSWORD_LENGTH = 12;
 
@@ -120,7 +128,13 @@ async function run(): Promise<void> {
     console.log(`\nCreated ${name.trim()} <${email}> as ${role}.`);
   }
 
-  console.log('They can sign in at http://localhost:3000/login\n');
+  // The dev port is only the right answer on a laptop; in a container the
+  // web app is wherever it is published.
+  console.log(
+    env.isProduction
+      ? 'They can sign in on the /login page of the web app.\n'
+      : 'They can sign in at http://localhost:3000/login\n',
+  );
 }
 
 async function main(): Promise<void> {
