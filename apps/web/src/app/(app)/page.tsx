@@ -1,5 +1,9 @@
-import { EmptyState } from '@/components/empty-state';
-import { IconDashboard } from '@/components/icons';
+import { Suspense } from 'react';
+
+import {
+  CommunicationsReport,
+  CommunicationsReportFallback,
+} from '@/components/dashboard/communications-report';
 import { PageHeader } from '@/components/page-header';
 
 export default function DashboardPage() {
@@ -9,11 +13,9 @@ export default function DashboardPage() {
         title="Dashboard"
         description="Συνολική εικόνα εταιρειών, επικοινωνιών και εκκρεμοτήτων."
       />
-      <EmptyState
-        icon={IconDashboard}
-        title="Εδώ θα εμφανίζονται οι αναφορές"
-        description="Όταν οι ενότητες αποκτήσουν δεδομένα, αυτή η σελίδα θα συνοψίζει τη δραστηριότητα και τις εκκρεμότητες με μια ματιά."
-      />
+      <Suspense fallback={<CommunicationsReportFallback />}>
+        <CommunicationsReport />
+      </Suspense>
     </>
   );
 }
