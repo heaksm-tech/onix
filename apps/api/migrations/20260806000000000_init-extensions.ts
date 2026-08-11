@@ -7,7 +7,7 @@ export const shorthands: undefined = undefined;
  * keeps `updated_at` current. Feature migrations build on top of this.
  *
  * Usage in a later migration:
- *   pgm.createTrigger('companies', 'set_updated_at', {
+ *   pgm.createTrigger('users', 'set_updated_at', {
  *     when: 'BEFORE', operation: 'UPDATE', level: 'ROW',
  *     function: 'set_updated_at',
  *   });

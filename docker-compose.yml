@@ -33,8 +33,12 @@ services:
       PORT: 4000
       LOG_LEVEL: ${LOG_LEVEL:-debug}
       DATABASE_URL: postgres://${POSTGRES_USER:-onix}:${POSTGRES_PASSWORD:-onix}@postgres:5432/${POSTGRES_DB:-onix_dev}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      # Empty: no browser calls this API cross-origin. See apps/api/.env.example.
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-14}
     ports:
+      # Published in development so you can curl the API directly. The
+      # production stack deliberately does not publish it.
       - '${API_PORT:-4000}:4000'
     volumes:
       # Bind-mount the source for hot reload, but keep the image's node_modules
@@ -53,10 +57,9 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      # Server components talk to the API over the compose network...
+      # The only address of the API anywhere in the web app. Browser code goes
+      # through this app's /api/v1 route, so it is never told where the API is.
       API_URL: http://api:4000/api/v1
-      # ...while browser code uses the host-published port.
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api/v1}
       WATCHPACK_POLLING: 'true'
     ports:
       - '${WEB_PORT:-3000}:3000'

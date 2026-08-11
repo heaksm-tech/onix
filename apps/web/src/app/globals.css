@@ -1,24 +1,64 @@
 @import 'tailwindcss';
 
-@theme {
+/*
+ * Onix design tokens.
+ *
+ * Semantic names only — components never reference raw palette values.
+ * Light/dark values live on :root and flip with the OS preference.
+ */
+@theme inline {
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-ink: var(--ink);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+
+  --shadow-card: 0 1px 2px rgb(16 16 20 / 0.04), 0 0 0 1px rgb(16 16 20 / 0.02);
+  --shadow-pop: 0 4px 16px rgb(16 16 20 / 0.08);
 }
 
+/*
+ * Each token carries both themes. Which one resolves is decided by
+ * `color-scheme`: the default below follows the OS, and `data-scheme` on
+ * <html> overrides it. Removing the attribute returns to following the OS.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
+  color-scheme: light dark;
+
+  --canvas: light-dark(#f8f8f7, #101012);
+  --surface: light-dark(#ffffff, #18181b);
+  --surface-hover: light-dark(#f4f4f3, #202024);
+  --ink: light-dark(#1a1a1e, #f2f2f3);
+  --ink-secondary: light-dark(#5b5b66, #a6a6af);
+  --ink-faint: light-dark(#9b9ba4, #6b6b74);
+  --line: light-dark(#e7e7e4, #26262b);
+  --line-strong: light-dark(#d4d4d1, #333338);
+  --accent: light-dark(#4f46e5, #818cf8);
+  --accent-strong: light-dark(#4338ca, #a5b4fc);
+  --accent-soft: light-dark(#eef0fd, #232345);
+  --positive: light-dark(#059669, #34d399);
+  --negative: light-dark(#dc2626, #f87171);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root[data-scheme='light'] {
+  color-scheme: light;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
+:root[data-scheme='dark'] {
+  color-scheme: dark;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 24%, transparent);
 }

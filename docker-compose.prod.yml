@@ -42,9 +42,16 @@ services:
       PORT: 4000
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      CORS_ORIGIN: ${CORS_ORIGIN:?required}
-    ports:
-      - '${API_PORT:-4000}:4000'
+      # No browser reaches this API cross-origin, so no origin is allowed.
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-14}
+      # Session cookies are Secure by default in production. What matters is
+      # how the browser reaches the *web* app — set this to false if that is
+      # plain HTTP, or the browser will discard the cookie.
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+    # Deliberately no `ports`: the API is reachable only from the web service
+    # over the compose network. Publishing it would put an internet-facing
+    # surface next to the one the web app already guards.
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -53,10 +60,6 @@ services:
     build:
       context: ./apps/web
       target: runner
-      args:
-        # NEXT_PUBLIC_* values are inlined at build time, so this must be the
-        # URL the *browser* will use — rebuild the image if it changes.
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?required}
     restart: unless-stopped
     environment:
       NODE_ENV: production
