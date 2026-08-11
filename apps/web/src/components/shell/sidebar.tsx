@@ -134,7 +134,7 @@ export function Sidebar({ user }: { user: AuthUser }) {
         </span>
         <span className="flex flex-col leading-tight">
           <span className="text-[15px] font-semibold tracking-tight">Onix CRM</span>
-          <span className="text-[11px] text-ink-faint">S. D. Melas Trading Business</span>
+          <span className="text-[11px] text-ink-faint">ΜΕΛΑΣ ΕΝΕΡΓΕΙΑΚΗ Α.Ε.</span>
         </span>
       </Link>
 

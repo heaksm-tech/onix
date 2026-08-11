@@ -42,7 +42,7 @@ export default async function LoginPage({
           </span>
           <div className="flex flex-col gap-1">
             <h1 className="text-xl font-semibold tracking-tight">Onix CRM</h1>
-            <p className="text-sm text-ink-secondary">S. D. Melas Trading Business</p>
+            <p className="text-sm text-ink-secondary">ΜΕΛΑΣ ΕΝΕΡΓΕΙΑΚΗ Α.Ε.</p>
           </div>
         </div>
 
