@@ -3,12 +3,11 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   typedRoutes: true,
-  experimental: {
-    // Puts each page's CSS in the document instead of a /_next/static request.
-    // The login page depends on this: it is served to visitors who have no
-    // session, and proxy.ts denies them everything under /_next/.
-    inlineCss: true,
-  },
+  // Next's development server validates browser origins before accepting its
+  // scripts and HMR WebSocket. Cloudflare Quick Tunnels use a new single-level
+  // hostname on every run, so allow that development-only hostname pattern.
+  // This setting is ignored by the production server (which has no HMR).
+  allowedDevOrigins: ['*.trycloudflare.com'],
   // Emits .next/standalone with a self-contained server.js, which is what the
   // production Docker image runs. Keeps the runtime layer small.
   output: 'standalone',

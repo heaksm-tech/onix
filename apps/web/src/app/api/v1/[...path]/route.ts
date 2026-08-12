@@ -9,8 +9,7 @@ import { SERVER_API_URL } from '@/lib/api-url';
  * only, and in Docker the API is not published outside the private network.
  * Everything the client needs comes through here, which buys three things —
  * the session cookie is first-party to the web origin, there is no CORS to
- * configure, and an unauthenticated visitor cannot reach the API at all,
- * because `proxy.ts` turns them away before this handler runs.
+ * configure, and Express receives the same first-party session cookie.
  *
  * This is a pipe, not a policy layer. Authorisation stays in Express, which
  * answers 401 for every route it does not serve publicly — including ones that

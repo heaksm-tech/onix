@@ -9,16 +9,7 @@ import { loginErrorMessage, safeNextPath } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Σύνδεση' };
 
-/**
- * Lives outside the `(app)` route group, so it renders on a bare canvas with
- * no sidebar or topbar — there is no workspace to navigate until someone has
- * signed in.
- *
- * It is also the only page an unauthenticated browser is served, and it is
- * served whole: the stylesheet is inlined and nothing here is a client
- * component, so the page needs no request to `/_next/*` — which `proxy.ts`
- * refuses anyway until there is a session.
- */
+/** Bare authentication screen outside the signed-in application shell. */
 export default async function LoginPage({
   searchParams,
 }: {
@@ -28,9 +19,8 @@ export default async function LoginPage({
   const next = safeNextPath(params.next);
   const error = loginErrorMessage(params.error);
 
-  // The middleware only knows whether a cookie exists. This is where a session
-  // is actually verified, which is why the "already signed in" redirect lives
-  // here and not there: a stale cookie lands on the form instead of in a loop.
+  // Validate rather than trusting cookie presence, so an expired cookie still
+  // reaches a usable form instead of bouncing between routes.
   if (await getCurrentUser()) redirect(next);
 
   return (
