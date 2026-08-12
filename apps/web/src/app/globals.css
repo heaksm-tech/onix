@@ -23,9 +23,11 @@
   --color-accent-soft: var(--accent-soft);
   --color-positive: var(--positive);
   --color-negative: var(--negative);
+  --color-scrim: var(--scrim);
 
   --shadow-card: 0 1px 2px rgb(16 16 20 / 0.04), 0 0 0 1px rgb(16 16 20 / 0.02);
   --shadow-pop: 0 4px 16px rgb(16 16 20 / 0.08);
+  --shadow-modal: 0 16px 48px rgb(16 16 20 / 0.18);
 }
 
 /*
@@ -49,6 +51,9 @@
   --accent-soft: light-dark(#eef0fd, #232345);
   --positive: light-dark(#059669, #34d399);
   --negative: light-dark(#dc2626, #f87171);
+  /* The wash behind a modal. Dark in both themes — it is shade, not a surface,
+     so it cannot be an alpha of `ink`, which inverts between them. */
+  --scrim: light-dark(rgb(16 16 20 / 0.32), rgb(0 0 0 / 0.6));
 }
 
 :root[data-scheme='light'] {
@@ -61,4 +66,75 @@
 
 ::selection {
   background: color-mix(in oklab, var(--accent) 24%, transparent);
+}
+
+/*
+ * Modal dialogs.
+ *
+ * `<dialog>` opened with showModal() brings the focus trap, Escape, the top
+ * layer and returning focus to the trigger — all the parts a hand-built modal
+ * gets wrong. What it does not bring is a transition: the property that
+ * changes is `display`, so the entry needs @starting-style and both directions
+ * need `allow-discrete` to keep the element painted while it animates out.
+ *
+ * The rules live here rather than on the component because ::backdrop is not
+ * reachable from a class in every engine, and because a dialog anywhere in the
+ * app should move the same way.
+ */
+dialog {
+  opacity: 0;
+  scale: 0.98;
+  translate: 0 0.5rem;
+  transition:
+    opacity 150ms ease,
+    scale 150ms ease,
+    translate 150ms ease,
+    display 150ms allow-discrete,
+    overlay 150ms allow-discrete;
+}
+
+dialog[open] {
+  opacity: 1;
+  scale: 1;
+  translate: none;
+}
+
+@starting-style {
+  dialog[open] {
+    opacity: 0;
+    scale: 0.98;
+    translate: 0 0.5rem;
+  }
+}
+
+dialog::backdrop {
+  background: var(--scrim);
+  opacity: 0;
+  transition:
+    opacity 150ms ease,
+    display 150ms allow-discrete,
+    overlay 150ms allow-discrete;
+}
+
+dialog[open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+/* showModal() makes the page inert but leaves it scrollable; this is the lock,
+   without the JS the mobile drawer needs for its non-modal panel. */
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog,
+  dialog::backdrop {
+    transition-duration: 1ms;
+  }
 }
