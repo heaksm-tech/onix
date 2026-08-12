@@ -79,8 +79,11 @@ const REPORT_TIME_ZONE = 'Europe/Athens';
 const ACTIVITY_DAYS = 14;
 const FOLLOW_UP_LIMIT = 6;
 const RECENT_LIMIT = 8;
-/** Rows per page of the communications list. */
-const PAGE_SIZE = 25;
+/**
+ * Rows per page of the communications list. Travels to the client in the
+ * response, so the list's page count follows this one number.
+ */
+const PAGE_SIZE = 20;
 
 const optionalText = (max: number) =>
   z
