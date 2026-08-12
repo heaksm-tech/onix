@@ -5,12 +5,6 @@ import { query, queryOne, transaction } from '../../db/index.js';
 import { HttpError } from '../../lib/http-error.js';
 import { validate } from '../../middleware/validate.js';
 
-type Company = {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-};
 type User = { id: string; name: string; email: string };
 type Communication = {
   id: string;
@@ -208,16 +202,6 @@ function toDetail(row: DetailRow) {
 }
 
 export const communicationsRouter: Router = Router();
-
-communicationsRouter.get('/companies', async (_req, res) => {
-  const companies = await query<Company>(
-    `SELECT id, name, email, phone
-       FROM companies
-      WHERE deleted_at IS NULL
-      ORDER BY lower(name)`,
-  );
-  res.json({ companies });
-});
 
 communicationsRouter.get('/users', async (_req, res) => {
   const users = await query<User>(

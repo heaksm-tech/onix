@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/require-auth.js';
 import { authRouter } from '../modules/auth/router.js';
 import { communicationsRouter } from '../modules/communications/router.js';
+import { companiesRouter } from '../modules/companies/router.js';
 import { healthRouter } from './health.js';
 
 /** Root of the v1 API. */
@@ -14,4 +15,5 @@ apiRouter.use(authRouter);
 
 // Everything past this point requires a session.
 apiRouter.use(requireAuth);
+apiRouter.use(companiesRouter);
 apiRouter.use(communicationsRouter);
