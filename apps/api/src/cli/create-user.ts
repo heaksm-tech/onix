@@ -24,10 +24,8 @@ import { Writable } from 'node:stream';
 
 import { env } from '../config/env.js';
 import { closePool, queryOne } from '../db/index.js';
-import { hashPassword } from '../modules/auth/password.js';
+import { MIN_PASSWORD_LENGTH, hashPassword } from '../modules/auth/password.js';
 import { USER_ROLES, type UserRole } from '../modules/auth/types.js';
-
-const MIN_PASSWORD_LENGTH = 12;
 
 /** Wraps stdout so the password prompts can be answered invisibly. */
 let muted = false;

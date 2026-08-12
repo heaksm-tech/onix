@@ -138,7 +138,7 @@ That is the whole setup.
 - `npm install` fetches the small root launcher.
 - `npm run setup` creates the env files, installs both apps, creates the
   `onix_dev` and `onix_test` databases, and applies all migrations.
-- `npm run db:seed` creates the development sign-in below.
+- `npm run db:seed` creates the two standard accounts below.
 - `npm run dev` starts both apps together with hot reload.
 
 | Service | URL                                 |
@@ -160,24 +160,50 @@ http://localhost:3000/login.
 The CRM is sign-in only — there is no registration page. Accounts are created
 from the command line.
 
-**For development**, seed the throwaway administrator:
+### The two seeded accounts
+
+Every deployment starts with the same two accounts, on a laptop and on the
+server alike:
 
 ```bash
 npm run db:seed
 ```
 
-| Field    | Value            |
-| -------- | ---------------- |
-| Email    | `admin@test.com` |
-| Password | `123456`         |
+| Email                     | Password       | Role        |
+| ------------------------- | -------------- | ----------- |
+| `admin@melaslogistics.gr` | `bb7P9rtwM6C%` | `admin`     |
+| `dev@melaslogistics.gr`   | `p46VWyt%Kv2k` | `technical` |
 
-Re-running updates that account rather than duplicating it. The script refuses
-to run with `NODE_ENV=production` — those credentials are for a laptop and
-nowhere else.
+Re-running restores both accounts to exactly those values rather than
+duplicating them, which makes the seed the way back in after a forgotten
+password — not only a first-run step. Existing accounts other than these two are
+left untouched.
 
-**For a real account**, use the interactive script. It prompts for the password
-(never taken from a flag, so it stays out of your shell history) and requires
-at least 12 characters:
+**These passwords are committed to this repository, so they are secrets from
+nobody.** They exist to get you signed in the first time. On anything reachable
+from the internet, change them once you are in:
+
+```bash
+npm run user:create -- --email admin@melaslogistics.gr
+```
+
+To reduce the table to those two accounts and nothing else:
+
+```bash
+npm run db:seed -- --reset
+```
+
+That deletes every other user and clears all sessions. Communications logged by
+a deleted account are **reassigned to `admin@melaslogistics.gr`** rather than
+deleted with it — the author is going away either way, and the record of the
+call is worth more than its attribution. The command prints every account it
+removed and how many communications it moved.
+
+### A real account
+
+For anyone else, use the interactive script. It prompts for the password (never
+taken from a flag, so it stays out of your shell history) and requires at least
+12 characters:
 
 ```bash
 npm run user:create
@@ -191,6 +217,27 @@ npm run user:create -- --email anna@melas.gr --name "Άννα Μελά" --role a
 
 Roles are `employee`, `manager`, `technical`, `admin`. Running it against an
 existing email sets a new password for that account and reactivates it.
+
+### On the production stack
+
+Both tools are compiled into the runtime image — that is why they live in
+`src/cli/` rather than in `scripts/`, which is laptop-only and never shipped. A
+freshly deployed stack has no accounts at all, so seeding is the step that makes
+it usable:
+
+```bash
+make prod-seed
+```
+
+| Target                 | Runs in the `api` container                |
+| ---------------------- | ------------------------------------------ |
+| `make prod-seed`       | `npm run db:seed:dist`                     |
+| `make prod-seed-reset` | `npm run db:seed:dist -- --reset`          |
+| `make prod-user`       | `npm run user:create:dist` (interactive)   |
+
+Migrations run on their own as a one-shot service before the API starts, so
+`make prod-up` leaves nothing to apply by hand. Seeding is the only manual step,
+and only when the accounts are not there yet.
 
 Sessions are rows in the `sessions` table, referenced by an httpOnly cookie, so
 signing out or deactivating a user takes effect on the next request. They last
@@ -294,7 +341,7 @@ npm run format         # prettier, both apps
 
 npm run install:all    # reinstall both apps' dependencies
 npm run db:setup       # create the dev and test databases
-npm run db:seed        # create the admin@test.com development sign-in
+npm run db:seed        # create or restore the two standard accounts
 npm run user:create    # create a real account, or reset someone's password
 ```
 
@@ -347,11 +394,11 @@ onix/
     ├── api/
     │   ├── .env.example
     │   ├── migrations/          # node-pg-migrate, TypeScript
-    │   ├── scripts/             # setup-local-db.ts, seed-user.ts — laptop only
+    │   ├── scripts/             # setup-local-db.ts — laptop only, never shipped
     │   └── src/
     │       ├── index.ts         # entrypoint, graceful shutdown
     │       ├── app.ts           # express app assembly
-    │       ├── cli/             # create-user.ts — compiled, so it ships in the image
+    │       ├── cli/             # create-user.ts, seed.ts — compiled, so they ship in the image
     │       ├── config/          # env validation (zod), logger (pino)
     │       ├── db/              # pool, query/queryOne/transaction helpers
     │       ├── lib/             # HttpError

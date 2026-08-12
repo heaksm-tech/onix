@@ -93,9 +93,18 @@ install-web: ## Add a dependency to the web app: make install-web pkg=clsx
 	@test -n "$(pkg)" || (echo "usage: make install-web pkg=<package>" && exit 1)
 	$(COMPOSE) exec web npm install $(pkg)
 
-.PHONY: prod-up prod-down
+.PHONY: prod-up prod-down prod-seed prod-seed-reset prod-user
 prod-up: ## Build and start the production stack
 	$(COMPOSE_PROD) up -d --build
 
 prod-down: ## Stop the production stack
 	$(COMPOSE_PROD) down
+
+prod-seed: ## Create or restore the two standard accounts
+	$(COMPOSE_PROD) exec api npm run db:seed:dist
+
+prod-seed-reset: ## Same, but delete every other account first (destructive)
+	$(COMPOSE_PROD) exec api npm run db:seed:dist -- --reset
+
+prod-user: ## Create a real account, or change a password
+	$(COMPOSE_PROD) exec api npm run user:create:dist

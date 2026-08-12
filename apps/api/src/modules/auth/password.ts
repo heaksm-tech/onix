@@ -11,6 +11,13 @@ import { promisify } from 'node:util';
  * so raising them later does not invalidate the passwords already stored.
  */
 
+/**
+ * The shortest password an account may be given. Enforced by the tools that
+ * set passwords — `user:create` and the seed — rather than at sign-in, where a
+ * length check would only leak how long the real password is.
+ */
+export const MIN_PASSWORD_LENGTH = 12;
+
 const scryptAsync = promisify(scrypt) as (
   password: string | Buffer,
   salt: Buffer,
