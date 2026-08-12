@@ -231,11 +231,11 @@ it usable:
 make prod-seed
 ```
 
-| Target                 | Runs in the `api` container                |
-| ---------------------- | ------------------------------------------ |
-| `make prod-seed`       | `npm run db:seed:dist`                     |
-| `make prod-seed-reset` | `npm run db:seed:dist -- --reset`          |
-| `make prod-user`       | `npm run user:create:dist` (interactive)   |
+| Target                 | Runs in the `api` container              |
+| ---------------------- | ---------------------------------------- |
+| `make prod-seed`       | `npm run db:seed:dist`                   |
+| `make prod-seed-reset` | `npm run db:seed:dist -- --reset`        |
+| `make prod-user`       | `npm run user:create:dist` (interactive) |
 
 Migrations run on their own as a one-shot service before the API starts, so
 `make prod-up` leaves nothing to apply by hand. Seeding is the only manual step,
@@ -461,7 +461,7 @@ the API container — the scripts from section 2a, unchanged:
 docker compose exec api npm run db:seed
 ```
 
-That is the throwaway `admin@test.com` / `123456` account. For a real one,
+That creates the two accounts from section 2a. For anyone else,
 `docker compose exec api npm run user:create` prompts the same way it does on
 the host.
 
@@ -486,15 +486,19 @@ docker compose -f docker-compose.prod.yml up -d --build
 Set `SESSION_COOKIE_SECURE=false` if the browser reaches the web app over plain
 HTTP, or it discards the session cookie and signing in appears to do nothing.
 
-A fresh deployment has no accounts and every page is behind sign-in, so make
-the first one. The runtime image carries no TypeScript and no dev dependencies,
-so it runs the compiled command rather than the `tsx` one:
+A fresh deployment has no accounts and every page is behind sign-in, so seed the
+two from section 2a. The runtime image carries no TypeScript and no dev
+dependencies, so both account tools run their compiled `:dist` form:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec api npm run user:create:dist
+make prod-seed
 ```
 
-It prompts exactly as it does on a laptop — `exec` gives it the terminal it
-needs. `db:seed` has no production counterpart on purpose: that account exists
-to save typing on a laptop, and the script refuses to run with
-`NODE_ENV=production`.
+Add `make prod-seed-reset` instead to make those two the only accounts in the
+database — it deletes every other user, and reassigns their communications to
+`admin@melaslogistics.gr` first, since a user with communications cannot be
+deleted otherwise.
+
+`make prod-user` runs `user:create:dist` and prompts exactly as it does on a
+laptop; `exec` gives it the terminal it needs. Use it to replace the committed
+seed passwords once you are signed in.
