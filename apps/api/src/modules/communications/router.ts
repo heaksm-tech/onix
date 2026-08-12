@@ -5,12 +5,6 @@ import { query, queryOne, transaction } from '../../db/index.js';
 import { HttpError } from '../../lib/http-error.js';
 import { validate } from '../../middleware/validate.js';
 
-type Company = {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-};
 type User = { id: string; name: string; email: string };
 type Communication = {
   id: string;
@@ -52,6 +46,30 @@ type RecentRow = {
   user_name: string;
 };
 
+/** One row of the communications list, and the same row with its full detail. */
+type ListRow = {
+  id: string;
+  company_id: string;
+  company_name: string;
+  contact_name: string | null;
+  outcome: string | null;
+  interest_level: number | null;
+  next_action: string | null;
+  next_action_at: string | null;
+  /** NULL when there is no reminder at all — the mapper reads that as "not late". */
+  overdue: boolean | null;
+  created_at: string;
+  user_id: string;
+  user_name: string;
+};
+type DetailRow = ListRow & {
+  company_email: string | null;
+  company_phone: string | null;
+  contact_role: string | null;
+  notes: string | null;
+  updated_at: string;
+};
+
 /**
  * Days are bucketed in the office's own timezone rather than UTC, so a call
  * logged at 01:00 in Athens counts towards that morning's report and not the
@@ -61,6 +79,11 @@ const REPORT_TIME_ZONE = 'Europe/Athens';
 const ACTIVITY_DAYS = 14;
 const FOLLOW_UP_LIMIT = 6;
 const RECENT_LIMIT = 8;
+/**
+ * Rows per page of the communications list. Travels to the client in the
+ * response, so the list's page count follows this one number.
+ */
+const PAGE_SIZE = 20;
 
 const optionalText = (max: number) =>
   z
@@ -80,24 +103,34 @@ const companyInput = z.object({
   phone: z.string().trim().min(1).max(30),
 });
 
+// `companies.id` is a bigserial, so this arrives as a numeric string — it is
+// kept as a string all the way to Postgres, which does the widening.
+const companyIdInput = z
+  .string()
+  .trim()
+  .regex(/^[1-9]\d*$/, 'Μη έγκυρο αναγνωριστικό εταιρείας.');
+
+/**
+ * The fields of a communication itself, shared by create and update so the
+ * two cannot drift apart. Only the company differs between them: creating
+ * accepts a new company, editing moves the record between existing ones.
+ */
+const communicationFields = {
+  userId: z.string().uuid(),
+  contactName: optionalText(150),
+  contactRole: optionalText(100),
+  outcome: z.enum(['no_answer', 'callback', 'interested', 'not_interested']).optional(),
+  interestLevel: z.number().int().min(1).max(5).optional(),
+  notes: optionalText(10_000),
+  nextAction: optionalText(255),
+  nextActionAt: z.string().datetime({ offset: true }).optional(),
+};
+
 const createCommunicationInput = z
   .object({
-    // `companies.id` is a bigserial, so this arrives as a numeric string —
-    // it is kept as a string all the way to Postgres, which does the widening.
-    companyId: z
-      .string()
-      .trim()
-      .regex(/^[1-9]\d*$/, 'Μη έγκυρο αναγνωριστικό εταιρείας.')
-      .optional(),
+    companyId: companyIdInput.optional(),
     company: companyInput.optional(),
-    userId: z.string().uuid(),
-    contactName: optionalText(150),
-    contactRole: optionalText(100),
-    outcome: z.enum(['no_answer', 'callback', 'interested', 'not_interested']).optional(),
-    interestLevel: z.number().int().min(1).max(5).optional(),
-    notes: optionalText(10_000),
-    nextAction: optionalText(255),
-    nextActionAt: z.string().datetime({ offset: true }).optional(),
+    ...communicationFields,
   })
   .superRefine((value, context) => {
     if (Boolean(value.companyId) === Boolean(value.company)) {
@@ -109,19 +142,69 @@ const createCommunicationInput = z
     }
   });
 
+/**
+ * A full replacement of the editable fields, not a patch: the edit form always
+ * submits every one of them, so an omitted optional field means "cleared".
+ */
+const updateCommunicationInput = z.object({
+  companyId: companyIdInput,
+  ...communicationFields,
+});
+
+const idParams = z.object({ id: z.string().uuid('Μη έγκυρο αναγνωριστικό επικοινωνίας.') });
+
+const listQuery = z.object({ page: z.coerce.number().int().min(1).default(1) });
+
 type CreateCommunicationInput = z.infer<typeof createCommunicationInput>;
+type UpdateCommunicationInput = z.infer<typeof updateCommunicationInput>;
+type IdParams = z.infer<typeof idParams>;
+type ListQuery = z.infer<typeof listQuery>;
+
+/**
+ * The columns behind a listed communication.
+ *
+ * Whether a reminder is late is settled here rather than in the browser, for
+ * the same reason the dashboard's follow-up list settles it in SQL: the
+ * database owns the clock the timestamp was written against.
+ */
+const LIST_COLUMNS = `c.id, c.company_id, co.name AS company_name, c.contact_name,
+              c.outcome, c.interest_level, c.next_action, c.next_action_at,
+              c.next_action_at < now() AS overdue,
+              c.created_at, c.user_id, u.name AS user_name`;
+
+const LIST_FROM = `FROM communications AS c
+         JOIN companies AS co ON co.id = c.company_id
+         JOIN users AS u ON u.id = c.user_id`;
+
+function toListItem(row: ListRow) {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    companyName: row.company_name,
+    contactName: row.contact_name,
+    outcome: row.outcome,
+    interestLevel: row.interest_level,
+    nextAction: row.next_action,
+    nextActionAt: row.next_action_at,
+    overdue: row.overdue ?? false,
+    createdAt: row.created_at,
+    userId: row.user_id,
+    userName: row.user_name,
+  };
+}
+
+function toDetail(row: DetailRow) {
+  return {
+    ...toListItem(row),
+    companyEmail: row.company_email,
+    companyPhone: row.company_phone,
+    contactRole: row.contact_role,
+    notes: row.notes,
+    updatedAt: row.updated_at,
+  };
+}
 
 export const communicationsRouter: Router = Router();
-
-communicationsRouter.get('/companies', async (_req, res) => {
-  const companies = await query<Company>(
-    `SELECT id, name, email, phone
-       FROM companies
-      WHERE deleted_at IS NULL
-      ORDER BY lower(name)`,
-  );
-  res.json({ companies });
-});
 
 communicationsRouter.get('/users', async (_req, res) => {
   const users = await query<User>(
@@ -250,12 +333,20 @@ communicationsRouter.post(
       let companyCreated = false;
 
       if (input.company) {
+        // A company name is unique among live companies. Left to the index the
+        // clash would be a 500, so it is caught here as a 409 the form can
+        // show next to the field — and caught by the same statement that
+        // inserts, which leaves no window for a second request to slip in.
         const company = await client.query<{ id: string }>(
           `INSERT INTO companies (name, email, phone)
          VALUES ($1, $2, $3)
+         ON CONFLICT (lower(name)) WHERE deleted_at IS NULL DO NOTHING
          RETURNING id`,
           [input.company.name, input.company.email ?? null, input.company.phone],
         );
+        if (company.rowCount === 0) {
+          throw HttpError.conflict(`Η εταιρεία «${input.company.name}» υπάρχει ήδη.`);
+        }
         companyId = company.rows[0]?.id;
         companyCreated = true;
       } else {
@@ -293,5 +384,124 @@ communicationsRouter.post(
     });
 
     res.status(201).json(result);
+  },
+);
+
+/**
+ * Every communication, newest first, one page at a time.
+ *
+ * `id` breaks ties in the sort: two records logged in the same millisecond
+ * would otherwise be free to swap places between pages and show up twice.
+ */
+communicationsRouter.get('/communications', validate(listQuery, 'query'), async (req, res) => {
+  const { page } = req.query as unknown as ListQuery;
+
+  const [items, totals] = await Promise.all([
+    query<ListRow>(
+      `SELECT ${LIST_COLUMNS}
+         ${LIST_FROM}
+        WHERE c.deleted_at IS NULL
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT $1 OFFSET $2`,
+      [PAGE_SIZE, (page - 1) * PAGE_SIZE],
+    ),
+    queryOne<{ count: number }>(
+      `SELECT count(*)::int AS count FROM communications WHERE deleted_at IS NULL`,
+    ),
+  ]);
+
+  res.json({
+    items: items.map(toListItem),
+    total: totals?.count ?? 0,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+});
+
+// Declared after `/communications/summary`, which is a literal path and would
+// otherwise be swallowed by this one — Express matches in declaration order.
+communicationsRouter.get('/communications/:id', validate(idParams, 'params'), async (req, res) => {
+  const { id } = req.params as IdParams;
+
+  const row = await queryOne<DetailRow>(
+    `SELECT ${LIST_COLUMNS}, co.email AS company_email, co.phone AS company_phone,
+              c.contact_role, c.notes, c.updated_at
+         ${LIST_FROM}
+        WHERE c.id = $1
+          AND c.deleted_at IS NULL`,
+    [id],
+  );
+
+  if (!row) throw HttpError.notFound('Η επικοινωνία δεν βρέθηκε.');
+
+  res.json({ communication: toDetail(row) });
+});
+
+communicationsRouter.put(
+  '/communications/:id',
+  validate(idParams, 'params'),
+  validate(updateCommunicationInput),
+  async (req, res) => {
+    const { id } = req.params as IdParams;
+    const input = req.body as UpdateCommunicationInput;
+
+    // Checked rather than left to the foreign key, so a stale option in the
+    // caller's dropdown reads as "company not found" instead of a 500.
+    const company = await queryOne(`SELECT 1 FROM companies WHERE id = $1 AND deleted_at IS NULL`, [
+      input.companyId,
+    ]);
+    if (!company) throw HttpError.notFound('Η εταιρεία δεν βρέθηκε.');
+
+    const updated = await queryOne<{ id: string }>(
+      `UPDATE communications
+          SET company_id = $2, user_id = $3, contact_name = $4, contact_role = $5,
+              outcome = $6, interest_level = $7, notes = $8, next_action = $9,
+              next_action_at = $10
+        WHERE id = $1
+          AND deleted_at IS NULL
+        RETURNING id`,
+      [
+        id,
+        input.companyId,
+        input.userId,
+        input.contactName ?? null,
+        input.contactRole ?? null,
+        input.outcome ?? null,
+        input.interestLevel ?? null,
+        input.notes ?? null,
+        input.nextAction ?? null,
+        input.nextActionAt ?? null,
+      ],
+    );
+
+    if (!updated) throw HttpError.notFound('Η επικοινωνία δεν βρέθηκε.');
+
+    res.status(204).end();
+  },
+);
+
+/**
+ * Soft delete: the row keeps its place in the table and every read filters on
+ * `deleted_at IS NULL`. A communication is a record of something that actually
+ * happened, so removing it from view must not remove it from history.
+ */
+communicationsRouter.delete(
+  '/communications/:id',
+  validate(idParams, 'params'),
+  async (req, res) => {
+    const { id } = req.params as IdParams;
+
+    const deleted = await queryOne<{ id: string }>(
+      `UPDATE communications
+          SET deleted_at = now()
+        WHERE id = $1
+          AND deleted_at IS NULL
+        RETURNING id`,
+      [id],
+    );
+
+    if (!deleted) throw HttpError.notFound('Η επικοινωνία δεν βρέθηκε.');
+
+    res.status(204).end();
   },
 );

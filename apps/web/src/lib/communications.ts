@@ -47,6 +47,45 @@ export function outcomeTone(outcome: string | null): string {
   return OUTCOME_TONES[key] ?? OUTCOME_TONES.unset;
 }
 
+/** «3/5» — or a dash where no level was recorded. */
+export function interestLabel(level: number | null): string {
+  return level === null ? '—' : `${level}/5`;
+}
+
+/** One row of `GET /communications`. */
+export type CommunicationListItem = {
+  id: string;
+  companyId: string;
+  companyName: string;
+  contactName: string | null;
+  outcome: string | null;
+  interestLevel: number | null;
+  nextAction: string | null;
+  nextActionAt: string | null;
+  /** Settled by the database, which owns the clock the reminder was written against. */
+  overdue: boolean;
+  createdAt: string;
+  userId: string;
+  userName: string;
+};
+
+/** What `GET /communications` returns: one page, plus how many there are. */
+export type CommunicationsPage = {
+  items: CommunicationListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+/** What `GET /communications/:id` returns — the list row plus everything else. */
+export type CommunicationDetail = CommunicationListItem & {
+  companyEmail: string | null;
+  companyPhone: string | null;
+  contactRole: string | null;
+  notes: string | null;
+  updatedAt: string;
+};
+
 /** What `GET /communications/summary` returns. */
 export type CommunicationsSummary = {
   totals: {
@@ -136,4 +175,79 @@ export function relativeDayLabel(days: number): string {
   if (days === 1) return 'αύριο';
   if (days === -1) return 'χθες';
   return days > 0 ? `σε ${days} ημέρες` : `πριν από ${Math.abs(days)} ημέρες`;
+}
+
+/**
+ * `<input type="datetime-local">` values, read and written in office time.
+ *
+ * A `datetime-local` control has no timezone: it hands over the wall clock the
+ * user typed. Left to `new Date(value)` that would mean the *browser's* zone,
+ * so the same reminder would read one way on a laptop in Athens and another on
+ * a server rendering in UTC — and a value written by one would not survive a
+ * round trip through the other. Both directions are therefore pinned to
+ * `Europe/Athens`, the way every other date in this module is.
+ */
+const dateTimeLocalParts = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+});
+
+type OfficeParts = Record<'year' | 'month' | 'day' | 'hour' | 'minute' | 'second', string>;
+
+function officeParts(instant: Date): OfficeParts {
+  const parts = new Map(
+    dateTimeLocalParts.formatToParts(instant).map((part) => [part.type, part.value]),
+  );
+  const at = (type: Intl.DateTimeFormatPartTypes) => parts.get(type) ?? '00';
+
+  return {
+    year: at('year'),
+    month: at('month'),
+    day: at('day'),
+    hour: at('hour'),
+    minute: at('minute'),
+    second: at('second'),
+  };
+}
+
+/** How far Athens is from UTC at a given instant — DST included. */
+function officeOffsetMs(instant: Date): number {
+  const p = officeParts(instant);
+  const asIfUtc = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour),
+    Number(p.minute),
+    Number(p.second),
+  );
+  return asIfUtc - (instant.getTime() - instant.getMilliseconds());
+}
+
+/** ISO timestamp → the `YYYY-MM-DDTHH:mm` the control expects. */
+export function toDateTimeLocal(iso: string): string {
+  const p = officeParts(new Date(iso));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+
+/**
+ * The control's value → an ISO timestamp.
+ *
+ * The offset is looked up twice because it is a function of the very instant
+ * being computed: the first pass lands within an hour of the answer, the
+ * second uses the offset in force *there*, which is what settles the two
+ * ambiguous hours a year when the clocks change.
+ */
+export function fromDateTimeLocal(value: string): string {
+  const wallClock = Date.parse(value.length === 16 ? `${value}:00Z` : `${value}Z`);
+  if (Number.isNaN(wallClock)) return new Date(value).toISOString();
+
+  const approximate = wallClock - officeOffsetMs(new Date(wallClock));
+  return new Date(wallClock - officeOffsetMs(new Date(approximate))).toISOString();
 }

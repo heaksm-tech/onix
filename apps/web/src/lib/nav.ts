@@ -27,7 +27,10 @@ export const NAV_ITEMS: NavItem[] = [
   {
     label: 'Εταιρείες - Συνεργασίες',
     icon: IconCompanies,
-    children: [{ label: 'Νέα επικοινωνία', href: '/companies/new-communication' }],
+    children: [
+      { label: 'Νέα επικοινωνία', href: '/companies/new-communication' },
+      { label: 'Όλες οι επικοινωνίες', href: '/companies/communications' },
+    ],
   },
 ];
 

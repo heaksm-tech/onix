@@ -24,6 +24,8 @@ import { LOGIN_ACTION_PATH, LOGIN_PATH, SESSION_COOKIE } from '@/lib/session';
  * would make a stale cookie bounce between them forever.
  */
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 /** Reachable without a session: the login document and the form it posts to. */
 const PUBLIC_PATHS = new Set<string>([LOGIN_PATH, LOGIN_ACTION_PATH]);
 
@@ -76,7 +78,13 @@ export function proxy(request: NextRequest) {
     // hold one visitor's copy and hand it to callers carrying no session.
     // `private` keeps the lifetime and confines the copy to the browser that
     // signed in for it.
-    if (pathname.startsWith('/_next/static/')) {
+    //
+    // Production only. In development the same names are re-served as the code
+    // changes, and `immutable` tells the browser never to ask again — a chunk
+    // edited after it was first loaded stays frozen, and the page runs an old
+    // copy of a module that no longer matches its callers. There is no reverse
+    // proxy in front of `next dev` for the rule to protect anything from.
+    if (isProduction && pathname.startsWith('/_next/static/')) {
       response.headers.set('Cache-Control', 'private, max-age=31536000, immutable');
     }
     return response;
