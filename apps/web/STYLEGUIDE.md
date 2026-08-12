@@ -127,6 +127,11 @@ tonos correctly) — write source copy in normal case.
   `allow-discrete` on `display` and `overlay`, or the element vanishes before it
   can animate out). The scroll lock is CSS too — `html:has(dialog[open])`.
   Everything here collapses to 1ms under `prefers-reduced-motion: reduce`.
+- Popovers that mount on open (`.popover-panel`, also in `globals.css`): the
+  same 150ms fade, with a 4px rise. Entry needs `@starting-style` for the same
+  reason a dialog does — the element does not exist to transition _from_ until
+  it appears. There is no exit half: unmounting takes the element with it, and a
+  panel that must animate out has to stay in the tree the way `dialog` does.
 - Hover: `hover:bg-ink/5` wash (or `hover:bg-surface-hover` on surfaces).
 - Focus: **every** interactive element gets
   `outline-none focus-visible:ring-2 focus-visible:ring-accent/60`.
@@ -173,6 +178,18 @@ rounded-xl`). Everything card-like uses it.
   A problem with one control belongs in that field's `error` prop (announced,
   and it replaces the hint) with `aria-invalid` on the control itself; the
   form-wide `role="alert"` line above the submit button is for everything else.
+- **`SearchSelect`** (`search-select.tsx`) — a select whose list is long enough
+  to need a filter: the trigger wears `controlClass` and shows the chosen
+  option, and the panel under it holds a search box above the list. **It is the
+  exception, not the rule** — a handful of options is still a native `<select>`,
+  which is the better control. Filtering starts at **two characters** (one
+  narrows nothing; below the threshold the whole list is offered, so the control
+  still behaves like the select it replaces) and is accent- and case-blind, so
+  «Οδός» is found by typing `οδος`; the matched run is tinted where it sits.
+  The options are not focusable — the search box keeps focus and points at the
+  active one with `aria-activedescendant`, which is what lets one control both
+  type and choose. Because it has no native validity, a form using it validates
+  the value itself, the way both communication forms already do.
 - **`icons.tsx`** — hand-rolled 24×24 stroke icons (`stroke-width 1.75`, round
   caps/joins, Lucide-style geometry). New icons are added here following the
   same recipe; **never install an icon package**. Default rendered sizes:
@@ -438,3 +455,4 @@ form-wide alert, and the submit button is disabled while it stands.
 | Time-relative values computed in SQL                | `Date.now()` during render                    |
 | `buttonClass` on a `Link` that acts                 | A `Button` with an `onClick` that navigates   |
 | Ask with `ConfirmDialog` before deleting            | `window.confirm`, or a modal built from a div |
+| `SearchSelect` only for a list worth filtering      | Replacing every `<select>` with it            |

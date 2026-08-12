@@ -132,9 +132,30 @@ html:has(dialog[open]) {
   overflow: hidden;
 }
 
+/*
+ * Popover panels that are mounted by opening them — today the search select's
+ * list. Same 150ms language as the dialog, and entry needs @starting-style for
+ * the same reason: the element does not exist to transition *from* until it
+ * appears. There is no exit half, because unmounting takes the element with it;
+ * a panel that must animate out has to stay in the tree, the way `dialog` does.
+ */
+.popover-panel {
+  transition:
+    opacity 150ms ease,
+    translate 150ms ease;
+}
+
+@starting-style {
+  .popover-panel {
+    opacity: 0;
+    translate: 0 -0.25rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   dialog,
-  dialog::backdrop {
+  dialog::backdrop,
+  .popover-panel {
     transition-duration: 1ms;
   }
 }

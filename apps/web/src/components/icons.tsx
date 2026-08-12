@@ -104,6 +104,22 @@ export function IconChevronRight(props: IconProps) {
   );
 }
 
+export function IconChevronDown(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </Base>
+  );
+}
+
+export function IconCheck(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M20 6 9 17l-5-5" />
+    </Base>
+  );
+}
+
 export function IconSearch(props: IconProps) {
   return (
     <Base {...props}>
