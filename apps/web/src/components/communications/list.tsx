@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { buttonClass } from '@/components/button';
 import { Card } from '@/components/card';
 import { DeleteCommunication } from '@/components/communications/delete-button';
-import { LoadError } from '@/components/communications/load-error';
 import { EmptyState } from '@/components/empty-state';
 import { IconActivity } from '@/components/icons';
+import { LoadError } from '@/components/load-error';
 import { cn } from '@/lib/cn';
 import {
   formatDateTime,
@@ -24,11 +24,13 @@ import { apiFetchAsUser } from '@/lib/server-api';
  * can take on it; the row's own text answers "who, with whom, how did it go"
  * so the reader rarely has to open anything.
  */
-export async function CommunicationsList({ page }: { page: number }) {
+export async function CommunicationsList({ page, userId }: { page: number; userId?: string }) {
   let result: CommunicationsPage;
 
   try {
-    result = await apiFetchAsUser<CommunicationsPage>(`/communications?page=${page}`);
+    const query = new URLSearchParams({ page: String(page) });
+    if (userId) query.set('userId', userId);
+    result = await apiFetchAsUser<CommunicationsPage>(`/communications?${query}`);
   } catch {
     return (
       <LoadError>Δεν ήταν δυνατή η φόρτωση των επικοινωνιών. Δοκιμάστε ξανά σε λίγο.</LoadError>
@@ -65,7 +67,7 @@ export async function CommunicationsList({ page }: { page: number }) {
         )}
       </Card>
 
-      <Pager page={page} pages={pages} total={total} />
+      <Pager page={page} pages={pages} total={total} userId={userId} />
     </div>
   );
 }
@@ -130,7 +132,17 @@ function CommunicationRow({ item }: { item: CommunicationListItem }) {
 }
 
 /** Page N of M, with the two moves that make sense from it. */
-function Pager({ page, pages, total }: { page: number; pages: number; total: number }) {
+function Pager({
+  page,
+  pages,
+  total,
+  userId,
+}: {
+  page: number;
+  pages: number;
+  total: number;
+  userId?: string;
+}) {
   if (pages === 1) return null;
 
   return (
@@ -139,10 +151,10 @@ function Pager({ page, pages, total }: { page: number; pages: number; total: num
         Σελίδα {page} από {pages} · {total} επικοινωνίες
       </p>
       <div className="flex items-center gap-2">
-        <PagerLink page={page - 1} available={page > 1}>
+        <PagerLink page={page - 1} available={page > 1} userId={userId}>
           Προηγούμενη
         </PagerLink>
-        <PagerLink page={page + 1} available={page < pages}>
+        <PagerLink page={page + 1} available={page < pages} userId={userId}>
           Επόμενη
         </PagerLink>
       </div>
@@ -154,10 +166,12 @@ function PagerLink({
   page,
   available,
   children,
+  userId,
 }: {
   page: number;
   available: boolean;
   children: string;
+  userId?: string;
 }) {
   // The unavailable end of the range keeps its place rather than disappearing,
   // so the pair of controls does not shift as you page through.
@@ -169,11 +183,11 @@ function PagerLink({
     );
   }
 
+  const query = new URLSearchParams({ page: String(page) });
+  if (userId) query.set('userId', userId);
+
   return (
-    <Link
-      href={`/companies/communications?page=${page}`}
-      className={buttonClass('secondary', 'sm')}
-    >
+    <Link href={`/companies/communications?${query}`} className={buttonClass('secondary', 'sm')}>
       {children}
     </Link>
   );

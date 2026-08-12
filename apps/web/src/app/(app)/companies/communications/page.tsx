@@ -3,8 +3,15 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { buttonClass } from '@/components/button';
+import {
+  CommunicationAccountFilter,
+  CommunicationAccountFilterFallback,
+} from '@/components/communications/account-filter';
 import { CommunicationsList, CommunicationsListFallback } from '@/components/communications/list';
 import { PageHeader } from '@/components/page-header';
+import { getCurrentUser } from '@/lib/auth';
+import { communicationUserFilter } from '@/lib/communications';
+import { canViewAllCommunications } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Επικοινωνίες' };
 
@@ -18,22 +25,35 @@ function readPage(value: string | string[] | undefined): number {
 export default async function CommunicationsPage({
   searchParams,
 }: PageProps<'/companies/communications'>) {
-  const page = readPage((await searchParams).page);
+  const query = await searchParams;
+  const page = readPage(query.page);
+  const user = await getCurrentUser();
+  const sharedView = user ? canViewAllCommunications(user.role) : false;
+  const userId = sharedView ? communicationUserFilter(query.userId) : undefined;
 
   return (
     <>
       <PageHeader
-        title="Όλες οι επικοινωνίες"
-        description="Όλες οι καταγεγραμμένες επικοινωνίες με εταιρείες, από την πιο πρόσφατη."
+        title={sharedView ? 'Όλες οι επικοινωνίες' : 'Οι επικοινωνίες μου'}
+        description={
+          sharedView
+            ? 'Όλες οι καταγεγραμμένες επικοινωνίες με εταιρείες, από την πιο πρόσφατη.'
+            : 'Οι επικοινωνίες που έχετε καταγράψει, από την πιο πρόσφατη.'
+        }
         action={
           <Link href="/companies/new-communication" className={buttonClass('primary')}>
             Νέα επικοινωνία
           </Link>
         }
       />
+      {sharedView ? (
+        <Suspense fallback={<CommunicationAccountFilterFallback />}>
+          <CommunicationAccountFilter userId={userId} />
+        </Suspense>
+      ) : null}
       {/* Keyed by page, so paging shows the fallback instead of the previous page's rows. */}
-      <Suspense key={page} fallback={<CommunicationsListFallback />}>
-        <CommunicationsList page={page} />
+      <Suspense key={`${page}:${userId ?? 'all'}`} fallback={<CommunicationsListFallback />}>
+        <CommunicationsList page={page} userId={userId} />
       </Suspense>
     </>
   );

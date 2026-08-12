@@ -4,9 +4,11 @@ import { Suspense } from 'react';
 
 import { buttonClass } from '@/components/button';
 import { EditCommunicationForm } from '@/components/communications/edit-form';
-import { LoadError } from '@/components/communications/load-error';
+import { LoadError } from '@/components/load-error';
 import { PageHeader } from '@/components/page-header';
 import { loadCommunication } from '@/lib/communication-record';
+import { getCurrentUser } from '@/lib/auth';
+import { canViewAllCommunications } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Επεξεργασία επικοινωνίας' };
 
@@ -42,7 +44,7 @@ function BackToRecord({ id }: { id: string }) {
 
 /** Fetches the record, then hands it to the form as its starting values. */
 async function EditCommunication({ id }: { id: string }) {
-  const communication = await loadCommunication(id);
+  const [communication, user] = await Promise.all([loadCommunication(id), getCurrentUser()]);
 
   if (!communication) {
     return (
@@ -69,7 +71,10 @@ async function EditCommunication({ id }: { id: string }) {
         description={`Καταγραφή με ${communication.companyName}.`}
         action={<BackToRecord id={communication.id} />}
       />
-      <EditCommunicationForm communication={communication} />
+      <EditCommunicationForm
+        communication={communication}
+        fixedUser={user && !canViewAllCommunications(user.role) ? user : undefined}
+      />
     </>
   );
 }
