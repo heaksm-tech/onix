@@ -1,9 +1,16 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
 
+import {
+  CommunicationDetailsFields,
+  EMPTY_DETAILS,
+  detailsPayload,
+  type CommunicationDetailsValues,
+  type CommunicationUser,
+} from '@/components/communications/details-fields';
 import { ApiError, apiFetch } from '@/lib/api';
-import { OUTCOMES, OUTCOME_LABELS } from '@/lib/communications';
 import { Button } from './button';
 import { Card } from './card';
 import { Field, controlClass } from './field';
@@ -14,52 +21,37 @@ type Company = {
   email: string | null;
   phone: string | null;
 };
-type User = { id: string; name: string; email: string };
 
-type FormValues = {
-  userId: string;
+/** The shared communication fields, plus the company this form can also create. */
+type FormValues = CommunicationDetailsValues & {
   companyId: string;
   companyName: string;
   companyEmail: string;
   companyPhone: string;
-  contactName: string;
-  contactRole: string;
-  outcome: string;
-  interestLevel: string;
-  notes: string;
-  nextAction: string;
-  nextActionAt: string;
 };
 
 const emptyValues: FormValues = {
-  userId: '',
+  ...EMPTY_DETAILS,
   companyId: '',
   companyName: '',
   companyEmail: '',
   companyPhone: '',
-  contactName: '',
-  contactRole: '',
-  outcome: '',
-  interestLevel: '',
-  notes: '',
-  nextAction: '',
-  nextActionAt: '',
 };
 
 export function NewCommunicationForm() {
+  const router = useRouter();
   const [values, setValues] = useState<FormValues>(emptyValues);
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<CommunicationUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
-  const [success, setSuccess] = useState<string>();
 
   useEffect(() => {
     void Promise.all([
       apiFetch<{ companies: Company[] }>('/companies'),
-      apiFetch<{ users: User[] }>('/users'),
+      apiFetch<{ users: CommunicationUser[] }>('/users'),
     ])
       .then(([companyData, userData]) => {
         setCompanies(companyData.companies);
@@ -76,7 +68,6 @@ export function NewCommunicationForm() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(undefined);
-    setSuccess(undefined);
 
     if (!values.userId) {
       setError('Επιλέξτε τον χρήστη που καταγράφει την επικοινωνία.');
@@ -100,7 +91,7 @@ export function NewCommunicationForm() {
       await apiFetch('/communications', {
         method: 'POST',
         body: JSON.stringify({
-          userId: values.userId,
+          ...detailsPayload(values),
           ...(mode === 'existing'
             ? { companyId: values.companyId }
             : {
@@ -110,27 +101,23 @@ export function NewCommunicationForm() {
                   phone: values.companyPhone,
                 },
               }),
-          contactName: values.contactName || undefined,
-          contactRole: values.contactRole || undefined,
-          outcome: values.outcome || undefined,
-          interestLevel: values.interestLevel ? Number(values.interestLevel) : undefined,
-          notes: values.notes || undefined,
-          nextAction: values.nextAction || undefined,
-          nextActionAt: values.nextActionAt
-            ? new Date(values.nextActionAt).toISOString()
-            : undefined,
         }),
       });
-      setValues((current) => ({ ...emptyValues, userId: current.userId }));
-      setMode('new');
-      setSuccess('Η επικοινωνία καταγράφηκε.');
+      // The list is the confirmation: it opens on the record that was just
+      // saved, sitting at the top. `refresh` is what makes the server-rendered
+      // page re-read — without it the navigation could land on a cached copy
+      // that predates the record.
+      router.push('/companies/communications');
+      router.refresh();
+      // `submitting` deliberately stays true: the button holds its disabled,
+      // "Αποθήκευση…" state until the new page takes over, so nothing can be
+      // submitted twice while the navigation is in flight.
     } catch (caught) {
       setError(
         caught instanceof ApiError
           ? caught.message
           : 'Δεν ήταν δυνατή η αποθήκευση της επικοινωνίας.',
       );
-    } finally {
       setSubmitting(false);
     }
   }
@@ -214,101 +201,12 @@ export function NewCommunicationForm() {
         )}
       </Card>
 
-      <Card className="p-5">
-        <div className="mb-5">
-          <h2 className="text-sm font-semibold">Επικοινωνία</h2>
-          <p className="mt-1 text-sm text-ink-secondary">
-            Καταγράψτε το αποτέλεσμα και την επόμενη ενέργεια.
-          </p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Καταχώριση από">
-            <select
-              required
-              disabled={loading || users.length === 0}
-              value={values.userId}
-              onChange={(event) => update('userId', event.target.value)}
-              className={controlClass}
-            >
-              <option value="">Επιλέξτε χρήστη</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name} · {user.email}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Αποτέλεσμα">
-            <select
-              value={values.outcome}
-              onChange={(event) => update('outcome', event.target.value)}
-              className={controlClass}
-            >
-              <option value="">Δεν έχει οριστεί</option>
-              {OUTCOMES.map((outcome) => (
-                <option key={outcome} value={outcome}>
-                  {OUTCOME_LABELS[outcome]}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Όνομα επαφής">
-            <input
-              value={values.contactName}
-              onChange={(event) => update('contactName', event.target.value)}
-              className={controlClass}
-            />
-          </Field>
-          <Field label="Ρόλος επαφής">
-            <input
-              value={values.contactRole}
-              onChange={(event) => update('contactRole', event.target.value)}
-              className={controlClass}
-            />
-          </Field>
-          <Field label="Επίπεδο ενδιαφέροντος">
-            <select
-              value={values.interestLevel}
-              onChange={(event) => update('interestLevel', event.target.value)}
-              className={controlClass}
-            >
-              <option value="">Δεν έχει οριστεί</option>
-              {[1, 2, 3, 4, 5].map((level) => (
-                <option key={level} value={level}>
-                  {level}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Υπενθύμιση για">
-            <input
-              type="datetime-local"
-              value={values.nextActionAt}
-              onChange={(event) => update('nextActionAt', event.target.value)}
-              className={controlClass}
-            />
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label="Επόμενη ενέργεια">
-              <input
-                value={values.nextAction}
-                onChange={(event) => update('nextAction', event.target.value)}
-                className={controlClass}
-                placeholder="π.χ. Αποστολή καταλόγου τιμών"
-              />
-            </Field>
-          </div>
-          <div className="sm:col-span-2">
-            <Field label="Σημειώσεις">
-              <textarea
-                value={values.notes}
-                onChange={(event) => update('notes', event.target.value)}
-                className={`${controlClass} min-h-28 resize-y`}
-              />
-            </Field>
-          </div>
-        </div>
-      </Card>
+      <CommunicationDetailsFields
+        values={values}
+        users={users}
+        disabled={loading}
+        onChange={update}
+      />
 
       {users.length === 0 && !loading ? (
         <p role="alert" className="text-sm text-negative">
@@ -318,11 +216,6 @@ export function NewCommunicationForm() {
       {error ? (
         <p role="alert" className="text-sm text-negative">
           {error}
-        </p>
-      ) : null}
-      {success ? (
-        <p role="status" className="text-sm text-positive">
-          {success}
         </p>
       ) : null}
       <div className="flex justify-end">

@@ -51,24 +51,30 @@ Each token declares both values at once — `--canvas: light-dark(#f8f8f7,
 Adding a token means adding one `light-dark()` line; there is no second block to
 keep in sync, and no media query anywhere.
 
-| Token           | Role                                            | Light     | Dark      |
-| --------------- | ----------------------------------------------- | --------- | --------- |
-| `canvas`        | App background (page, sidebar, topbar)          | `#f8f8f7` | `#101012` |
-| `surface`       | Cards, active nav pill, inputs                  | `#ffffff` | `#18181b` |
-| `surface-hover` | Hover state of `surface` elements               | `#f4f4f3` | `#202024` |
-| `ink`           | Primary text; primary button background         | `#1a1a1e` | `#f2f2f3` |
-| `ink-secondary` | Supporting text, descriptions, inactive nav     | `#5b5b66` | `#a6a6af` |
-| `ink-faint`     | Placeholders, captions, disabled, icons at rest | `#9b9ba4` | `#6b6b74` |
-| `line`          | Hairline borders, dividers                      | `#e7e7e4` | `#26262b` |
-| `line-strong`   | Border hover emphasis                           | `#d4d4d1` | `#333338` |
-| `accent`        | THE accent (indigo): active icons, focus, links | `#4f46e5` | `#818cf8` |
-| `accent-strong` | Accent hover / gradient end                     | `#4338ca` | `#a5b4fc` |
-| `accent-soft`   | Accent-tinted chip/icon backgrounds             | `#eef0fd` | `#232345` |
-| `positive`      | Success (status dots, confirmations)            | `#059669` | `#34d399` |
-| `negative`      | Errors, destructive                             | `#dc2626` | `#f87171` |
+| Token           | Role                                            | Light         | Dark          |
+| --------------- | ----------------------------------------------- | ------------- | ------------- |
+| `canvas`        | App background (page, sidebar, topbar)          | `#f8f8f7`     | `#101012`     |
+| `surface`       | Cards, active nav pill, inputs                  | `#ffffff`     | `#18181b`     |
+| `surface-hover` | Hover state of `surface` elements               | `#f4f4f3`     | `#202024`     |
+| `ink`           | Primary text; primary button background         | `#1a1a1e`     | `#f2f2f3`     |
+| `ink-secondary` | Supporting text, descriptions, inactive nav     | `#5b5b66`     | `#a6a6af`     |
+| `ink-faint`     | Placeholders, captions, disabled, icons at rest | `#9b9ba4`     | `#6b6b74`     |
+| `line`          | Hairline borders, dividers                      | `#e7e7e4`     | `#26262b`     |
+| `line-strong`   | Border hover emphasis                           | `#d4d4d1`     | `#333338`     |
+| `accent`        | THE accent (indigo): active icons, focus, links | `#4f46e5`     | `#818cf8`     |
+| `accent-strong` | Accent hover / gradient end                     | `#4338ca`     | `#a5b4fc`     |
+| `accent-soft`   | Accent-tinted chip/icon backgrounds             | `#eef0fd`     | `#232345`     |
+| `positive`      | Success (status dots, confirmations)            | `#059669`     | `#34d399`     |
+| `negative`      | Errors, destructive                             | `#dc2626`     | `#f87171`     |
+| `scrim`         | The wash behind a modal                         | `#101014` 32% | `#000000` 60% |
+
+`scrim` is the one token that is dark in **both** themes: it is shade, not a
+surface, so it cannot be an alpha of `ink` — that inverts between themes and
+would haze the page white in dark mode.
 
 Shadows: `shadow-card` (default card/pill elevation — includes a faint 1px
-ring) and `shadow-pop` (menus, popovers).
+ring), `shadow-pop` (menus, popovers) and `shadow-modal` (dialogs, the only
+place a heavy shadow is right — it is what lifts the panel off the scrim).
 
 **Accent discipline** — the accent appears only in small doses: active nav
 icons, focus rings, the logo stone, empty-state icon chips, links, tiny status
@@ -116,6 +122,11 @@ tonos correctly) — write source copy in normal case.
 - Color/opacity transitions: `transition-colors duration-150`.
 - Structural transitions (expand/collapse): 200ms; submenus animate via CSS grid
   `grid-rows-[0fr] → [1fr]` with an `overflow-hidden` inner wrapper.
+- Dialogs: 150ms fade + 2% scale, both directions, defined once on the `dialog`
+  element in `globals.css` (entry needs `@starting-style`, exit needs
+  `allow-discrete` on `display` and `overlay`, or the element vanishes before it
+  can animate out). The scroll lock is CSS too — `html:has(dialog[open])`.
+  Everything here collapses to 1ms under `prefers-reduced-motion: reduce`.
 - Hover: `hover:bg-ink/5` wash (or `hover:bg-surface-hover` on surfaces).
 - Focus: **every** interactive element gets
   `outline-none focus-visible:ring-2 focus-visible:ring-accent/60`.
@@ -132,12 +143,28 @@ All in `src/components/` — import, don't duplicate:
 - **`Card`** — the only surface primitive (`border-line bg-surface shadow-card
 rounded-xl`). Everything card-like uses it.
 - **`Button`** — variants: `primary` (ink bg — max one per view), `secondary`
-  (bordered surface), `ghost` (text + hover wash). Extend with variants, not
-  one-off classes.
+  (bordered surface), `ghost` (text + hover wash), `danger` (negative text +
+  tinted hover, for destructive actions). Sizes: `md` (default, `h-9`) and
+  `sm` (`h-8`, for actions inside a list row). Extend with variants, not
+  one-off classes. `buttonClass(variant, size, className)` is the same styling
+  without the element, for the one case a `<button>` cannot cover: a `Link`
+  that acts as an action («Επεξεργασία»). Anything that _does_ something
+  rather than _goes_ somewhere stays a `Button`.
 - **`PageHeader`** — title + optional description + optional right-side
   `action`. Every page starts with it.
 - **`EmptyState`** — icon + title + description inside a `Card`. The standard
   body for not-yet-built or zero-data states.
+- **`ConfirmDialog`** — the app's only modal, and the only way to ask before
+  doing something irreversible. Props: `open` `title` `description`
+  `confirmLabel` `cancelLabel` `busyLabel` `tone` (`accent` | `danger`) `icon`
+  `busy` `error` `onConfirm` `onCancel`. It is a native `<dialog>` opened with
+  `showModal()` — that is what supplies the focus trap, Escape, the top layer,
+  the inert page and the return of focus to the trigger, so **never hand-build
+  a modal out of a fixed div**. Three rules it keeps, which any caller must
+  respect: `open` is owned by the caller and the dialog never closes itself;
+  while `busy` nothing dismisses it; and a failure is passed back in as `error`
+  rather than closing the prompt. Focus starts on the cancel button — a stray
+  Enter must give the safe answer.
 - **`Field` / `controlClass`** (`field.tsx`) — the form contract. `Field` is a
   labelled row (label above, optional hint below); `controlClass` carries the
   input styling and goes on native `input`, `select` and `textarea` alike.
@@ -321,22 +348,80 @@ reminder is late, how many days until it is due — is computed in SQL and
 travels with the row. Rendering must stay pure: reading `Date.now()` during
 render is both a lint error and a source of server/browser disagreement.
 Formatting is fixed to `Europe/Athens` in `lib/communications.ts`, so a deploy
-on a UTC host cannot shift what «σήμερα» means for the office.
+on a UTC host cannot shift what «σήμερα» means for the office. The same applies
+to input: `<input type="datetime-local">` hands over a bare wall clock, so it
+is read and written through `toDateTimeLocal` / `fromDateTimeLocal`, never
+through `new Date(value)` — which would silently mean the browser's zone and
+would not survive a round trip through a server in another one.
 
 ---
 
-## 11. Quick do / don't
+## 11. Record screens (list → detail → edit)
 
-| Do                                                  | Don't                                      |
-| --------------------------------------------------- | ------------------------------------------ |
-| `bg-surface`, `text-ink-secondary`                  | `bg-white`, `text-gray-500`, hex in JSX    |
-| Extend `Button` with a variant                      | One-off `<button className="…">`           |
-| Add icons by hand in `icons.tsx`                    | `npm install lucide-react` (or any UI lib) |
-| Greek copy, formal plural                           | English strings, informal («μπες»)         |
-| `focus-visible:ring-2 focus-visible:ring-accent/60` | Removing focus outlines entirely           |
-| Group nav item → submenu only                       | Giving a group its own page/route          |
-| One ink `primary` button per view                   | Accent-colored or multiple primary buttons |
-| `prefers-color-scheme` via tokens                   | `dark:` classes in components              |
-| Hand-built bars, tokens for colour                  | A chart library, or a raw hue per series   |
-| `apiFetchAsUser` in server components               | `apiFetch` without the session cookie      |
-| Time-relative values computed in SQL                | `Date.now()` during render                 |
+Communications are the reference implementation
+(`src/components/communications/`, fed by `GET /communications`).
+
+**Three routes, one section.** `/companies/communications` lists, `…/[id]`
+shows one record in full, `…/[id]/edit` changes it. The list and the detail are
+server components; only the form and the delete action are `'use client'`.
+
+**Fetching.** Each screen's async component fetches its own data through
+`apiFetchAsUser` and the page wraps it in `<Suspense>`, so nothing blocks on
+the API — including the detail header, whose title is the record's company.
+Page `metadata.title` therefore stays static Greek; do not add a
+`generateMetadata` that fetches the record a second time. A record that is
+missing calls `notFound()` (`loadCommunication` in `lib/communication-record.ts`
+does this for both screens); an API that did not answer renders `LoadError`.
+
+**Rows.** A list is a `Card` around a `<ul>` of hairline-separated rows
+(`border-b border-line … last:border-0`), each row: identity on the left,
+outcome and date on the right, then its actions as `sm` `ghost` controls.
+Icon-free text actions carry the record in their `aria-label`
+(«Επεξεργασία επικοινωνίας με …»), since "Επεξεργασία" alone is not a name.
+
+**Paging.** The API pages; the URL carries `?page=`. The pager states «Σελίδα N
+από M» and keeps the unavailable end in place rather than dropping it, so the
+controls do not shift. `<Suspense key={page}>` makes paging show the fallback
+instead of the previous page's rows.
+
+**Destructive actions.** The trigger is a quiet `danger` button that only opens
+a `ConfirmDialog` (§6); the deed itself is the `destructive` button inside it.
+Nothing in the app deletes on a first click. Deletion is soft on the API side,
+and the client only calls `router.refresh()` — the list is server-rendered and
+re-reads itself.
+
+**A saved form leaves.** Creating or editing a record ends with
+`router.push()` to the list or the detail screen, followed by `router.refresh()`
+so the server-rendered page re-reads rather than restoring a copy that predates
+the save. The record itself — at the top of the list, or on its own page — is
+the confirmation, so there is no success banner to show and no form to reset.
+`submitting` stays `true` through the navigation, which keeps the button
+disabled and makes a double submit impossible.
+
+**Forms are shared, not copied.** The fields of a communication live once, in
+`communications/details-fields.tsx`, and both the create and the edit form
+render them; `detailsPayload()` is the single place control values become a
+request body. Mirrors the API, which builds its create and update schemas from
+one set of fields. A select whose options load asynchronously always offers the
+record's current value in the meantime — a form must not be able to change what
+it is only displaying.
+
+---
+
+## 12. Quick do / don't
+
+| Do                                                  | Don't                                         |
+| --------------------------------------------------- | --------------------------------------------- |
+| `bg-surface`, `text-ink-secondary`                  | `bg-white`, `text-gray-500`, hex in JSX       |
+| Extend `Button` with a variant                      | One-off `<button className="…">`              |
+| Add icons by hand in `icons.tsx`                    | `npm install lucide-react` (or any UI lib)    |
+| Greek copy, formal plural                           | English strings, informal («μπες»)            |
+| `focus-visible:ring-2 focus-visible:ring-accent/60` | Removing focus outlines entirely              |
+| Group nav item → submenu only                       | Giving a group its own page/route             |
+| One ink `primary` button per view                   | Accent-colored or multiple primary buttons    |
+| `prefers-color-scheme` via tokens                   | `dark:` classes in components                 |
+| Hand-built bars, tokens for colour                  | A chart library, or a raw hue per series      |
+| `apiFetchAsUser` in server components               | `apiFetch` without the session cookie         |
+| Time-relative values computed in SQL                | `Date.now()` during render                    |
+| `buttonClass` on a `Link` that acts                 | A `Button` with an `onClick` that navigates   |
+| Ask with `ConfirmDialog` before deleting            | `window.confirm`, or a modal built from a div |
