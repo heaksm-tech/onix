@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { Fragment } from 'react';
 
 import { IconBell, IconSearch } from '@/components/icons';
+import { AccountMenu } from '@/components/shell/account-menu';
 import { MobileNav } from '@/components/shell/mobile-nav';
 import { cn } from '@/lib/cn';
 import { breadcrumbTrail } from '@/lib/nav';
@@ -55,6 +56,8 @@ export function Topbar({ user }: { user: AuthUser }) {
         <IconBell className="size-[18px]" />
         <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-accent" />
       </button>
+
+      <AccountMenu user={user} />
     </header>
   );
 }

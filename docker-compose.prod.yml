@@ -49,6 +49,10 @@ services:
       # how the browser reaches the *web* app — set this to false if that is
       # plain HTTP, or the browser will discard the cookie.
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      # Production sends to the account itself, from the verified-domain
+      # address below. Both are required by compose and validated again by the API.
+      RESEND_API_KEY: ${RESEND_API_KEY:?required}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:?required}
     # Deliberately no `ports`: the API is reachable only from the web service
     # over the compose network. Publishing it would put an internet-facing
     # surface next to the one the web app already guards.

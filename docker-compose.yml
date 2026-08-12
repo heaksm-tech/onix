@@ -36,6 +36,10 @@ services:
       # Empty: no browser calls this API cross-origin. See apps/api/.env.example.
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-14}
+      # Development uses Resend's test sender and never addresses the account
+      # whose password changed; see .env.example for the safe default recipient.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_DEV_TO: ${RESEND_DEV_TO:-delivered+password-change@resend.dev}
     ports:
       # Published in development so you can curl the API directly. The
       # production stack deliberately does not publish it.

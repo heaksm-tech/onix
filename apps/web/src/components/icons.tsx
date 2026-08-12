@@ -157,6 +157,17 @@ export function IconLogout(props: IconProps) {
   );
 }
 
+export function IconKey(props: IconProps) {
+  return (
+    <Base {...props}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="m11 12 8-8" />
+      <path d="m15 8 2 2" />
+      <path d="m17 6 2 2" />
+    </Base>
+  );
+}
+
 export function IconMenu(props: IconProps) {
   return (
     <Base {...props}>

@@ -201,6 +201,9 @@ rounded-xl`). Everything card-like uses it.
   pages never render their own chrome. Breadcrumbs derive automatically from
   nav. `NavList` is the nav rows themselves, rendered by both the sidebar and
   the mobile drawer — add nav behavior there, not in either shell.
+  `AccountMenu` is the one home of account actions at every viewport: identity,
+  password change and sign-out. `UserCard` in the sidebar/drawer is identity
+  only, so never add a second copy of those actions there.
 - **Dashboard** (`src/components/dashboard/`) — the report primitives:
   `StatTile` (one headline number), `ReportCard` (titled panel, optional note
   opposite the heading) and `ReportEmpty` (quiet in-panel zero state). See §10.
@@ -305,6 +308,26 @@ do so. Route groups do not appear in the URL: `(auth)/login/page.tsx` is
   `ROLE_LABELS` and `initials()` from `lib/session.ts`.
 - Role labels are Greek and live in one place (`ROLE_LABELS`). Never spell a
   role out in JSX.
+
+### Account password
+
+`/account/password` is reached from `AccountMenu`, not the primary navigation,
+and is available to every signed-in role. It asks for the current password and
+the replacement twice. The minimum length is 12 characters, matching the
+account CLI; the API is authoritative for every rule even when the form answers
+first.
+
+A successful change keeps the session that proved the current password and
+revokes every other session for that account. The notification email is sent
+after the database transaction commits. A Resend failure therefore cannot undo
+or cast doubt on a password that already changed: the response carries
+`notificationSent`, and the form reports the partial outcome explicitly.
+
+Email configuration belongs to the API only. In development it sends from
+`onboarding@resend.dev` to `RESEND_DEV_TO` (the safe Resend delivered address by
+default); in production it sends from `RESEND_FROM_EMAIL` at the verified domain
+to the account's own email. `NODE_ENV` chooses the branch. No Resend key or
+sender address may enter the web package or a `NEXT_PUBLIC_*` value.
 
 ### The anonymous perimeter
 
