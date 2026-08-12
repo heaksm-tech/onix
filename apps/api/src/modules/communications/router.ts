@@ -346,12 +346,20 @@ communicationsRouter.post(
       let companyCreated = false;
 
       if (input.company) {
+        // A company name is unique among live companies. Left to the index the
+        // clash would be a 500, so it is caught here as a 409 the form can
+        // show next to the field — and caught by the same statement that
+        // inserts, which leaves no window for a second request to slip in.
         const company = await client.query<{ id: string }>(
           `INSERT INTO companies (name, email, phone)
          VALUES ($1, $2, $3)
+         ON CONFLICT (lower(name)) WHERE deleted_at IS NULL DO NOTHING
          RETURNING id`,
           [input.company.name, input.company.email ?? null, input.company.phone],
         );
+        if (company.rowCount === 0) {
+          throw HttpError.conflict(`Η εταιρεία «${input.company.name}» υπάρχει ήδη.`);
+        }
         companyId = company.rows[0]?.id;
         companyCreated = true;
       } else {

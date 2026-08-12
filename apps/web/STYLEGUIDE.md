@@ -170,6 +170,9 @@ rounded-xl`). Everything card-like uses it.
   input styling and goes on native `input`, `select` and `textarea` alike.
   There is no styled input component — the native elements already behave, they
   only need the tokens. Never re-declare that class string in a form.
+  A problem with one control belongs in that field's `error` prop (announced,
+  and it replaces the hint) with `aria-invalid` on the control itself; the
+  form-wide `role="alert"` line above the submit button is for everything else.
 - **`icons.tsx`** — hand-rolled 24×24 stroke icons (`stroke-width 1.75`, round
   caps/joins, Lucide-style geometry). New icons are added here following the
   same recipe; **never install an icon package**. Default rendered sizes:
@@ -405,6 +408,16 @@ request body. Mirrors the API, which builds its create and update schemas from
 one set of fields. A select whose options load asynchronously always offers the
 record's current value in the meantime — a form must not be able to change what
 it is only displaying.
+
+**A company name is unique, and both forms say so before saving.** The database
+holds a unique index on the trimmed, case-folded name of every live company, so
+the API answers 409 when a name is taken — creating one on the
+new-communication form, or renaming one on the edit form. Both forms compare
+against the company list they already loaded (`lib/companies.ts`) while the name
+is typed, so the answer arrives before a request is sent; the 409 covers what
+that list cannot see — a company added by someone else since the form loaded.
+Either way the message lands in the name field's `error`, never in the
+form-wide alert, and the submit button is disabled while it stands.
 
 ---
 

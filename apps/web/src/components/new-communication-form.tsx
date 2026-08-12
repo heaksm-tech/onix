@@ -11,6 +11,7 @@ import {
   type CommunicationUser,
 } from '@/components/communications/details-fields';
 import { ApiError, apiFetch } from '@/lib/api';
+import { companyNameKey, companyWithName } from '@/lib/companies';
 import { Button } from './button';
 import { Card } from './card';
 import { Field, controlClass } from './field';
@@ -38,6 +39,8 @@ const emptyValues: FormValues = {
   companyPhone: '',
 };
 
+const DUPLICATE_COMPANY = 'Η εταιρεία υπάρχει ήδη. Επιλέξτε την από τις υπάρχουσες εταιρείες.';
+
 export function NewCommunicationForm() {
   const router = useRouter();
   const [values, setValues] = useState<FormValues>(emptyValues);
@@ -47,6 +50,12 @@ export function NewCommunicationForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
+  /**
+   * A name the API rejected as taken. The list below catches almost every
+   * duplicate as it is typed; this covers the one it cannot see — a company
+   * added by someone else after this form loaded.
+   */
+  const [takenName, setTakenName] = useState<string>();
 
   useEffect(() => {
     void Promise.all([
@@ -64,6 +73,13 @@ export function NewCommunicationForm() {
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
   }
+
+  // Derived rather than stored, so the message appears and clears with the
+  // field itself instead of waiting for a submit to re-check it.
+  const typedName = companyNameKey(values.companyName);
+  const duplicateCompany =
+    mode === 'new' &&
+    (Boolean(companyWithName(companies, values.companyName)) || takenName === typedName);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,6 +101,8 @@ export function NewCommunicationForm() {
       setError('Συμπληρώστε το τηλέφωνο της νέας εταιρείας.');
       return;
     }
+    // The message is already under the field, so this only stops the request.
+    if (duplicateCompany) return;
 
     setSubmitting(true);
     try {
@@ -113,11 +131,17 @@ export function NewCommunicationForm() {
       // "Αποθήκευση…" state until the new page takes over, so nothing can be
       // submitted twice while the navigation is in flight.
     } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : 'Δεν ήταν δυνατή η αποθήκευση της επικοινωνίας.',
-      );
+      // A taken name belongs under the name field, not in the form-wide
+      // message: it is that one input the user has to change.
+      if (caught instanceof ApiError && caught.status === 409) {
+        setTakenName(typedName);
+      } else {
+        setError(
+          caught instanceof ApiError
+            ? caught.message
+            : 'Δεν ήταν δυνατή η αποθήκευση της επικοινωνίας.',
+        );
+      }
       setSubmitting(false);
     }
   }
@@ -154,9 +178,10 @@ export function NewCommunicationForm() {
         {mode === 'new' ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <Field label="Επωνυμία">
+              <Field label="Επωνυμία" error={duplicateCompany ? DUPLICATE_COMPANY : undefined}>
                 <input
                   required
+                  aria-invalid={duplicateCompany}
                   value={values.companyName}
                   onChange={(event) => update('companyName', event.target.value)}
                   className={controlClass}
@@ -219,7 +244,10 @@ export function NewCommunicationForm() {
         </p>
       ) : null}
       <div className="flex justify-end">
-        <Button type="submit" disabled={loading || submitting || users.length === 0}>
+        <Button
+          type="submit"
+          disabled={loading || submitting || users.length === 0 || duplicateCompany}
+        >
           {submitting ? 'Αποθήκευση…' : 'Καταχώριση επικοινωνίας'}
         </Button>
       </div>
