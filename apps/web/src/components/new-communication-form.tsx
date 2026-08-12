@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 
 import {
   CommunicationDetailsFields,
@@ -12,6 +12,7 @@ import {
 } from '@/components/communications/details-fields';
 import { ApiError, apiFetch } from '@/lib/api';
 import { companyNameKey, companyWithName } from '@/lib/companies';
+import { SearchSelect, type SearchSelectOption } from '@/components/search-select';
 import { Button } from './button';
 import { Card } from './card';
 import { Field, controlClass } from './field';
@@ -73,6 +74,11 @@ export function NewCommunicationForm() {
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
   }
+
+  const companyOptions = useMemo<SearchSelectOption[]>(
+    () => companies.map((company) => ({ value: company.id, label: company.name })),
+    [companies],
+  );
 
   // Derived rather than stored, so the message appears and clears with the
   // field itself instead of waiting for a submit to re-check it.
@@ -208,20 +214,16 @@ export function NewCommunicationForm() {
           </div>
         ) : (
           <Field label="Εταιρεία">
-            <select
-              required
-              disabled={loading}
+            <SearchSelect
+              options={companyOptions}
               value={values.companyId}
-              onChange={(event) => update('companyId', event.target.value)}
-              className={controlClass}
-            >
-              <option value="">Επιλέξτε εταιρεία</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
+              onChange={(id) => update('companyId', id)}
+              disabled={loading}
+              placeholder={loading ? 'Φόρτωση εταιρειών…' : 'Επιλέξτε εταιρεία'}
+              searchPlaceholder="Αναζήτηση εταιρείας…"
+              searchLabel="Αναζήτηση εταιρείας"
+              emptyLabel="Δεν βρέθηκε εταιρεία."
+            />
           </Field>
         )}
       </Card>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { Button, buttonClass } from '@/components/button';
 import { Card } from '@/components/card';
@@ -13,6 +13,7 @@ import {
   type CommunicationUser,
 } from '@/components/communications/details-fields';
 import { Field, controlClass } from '@/components/field';
+import { SearchSelect, type SearchSelectOption } from '@/components/search-select';
 import { ApiError, apiFetch } from '@/lib/api';
 import { companyNameKey, companyWithName, type CompanyOption } from '@/lib/companies';
 import { toDateTimeLocal, type CommunicationDetail } from '@/lib/communications';
@@ -82,9 +83,18 @@ export function EditCommunicationForm({ communication }: { communication: Commun
   // Until the list arrives — and if the selected company is no longer on it —
   // the record's own company is still offered, so opening the form and saving
   // it cannot silently move the communication somewhere else.
-  const companyOptions = companies.some((company) => company.id === values.companyId)
-    ? companies
-    : [{ id: communication.companyId, name: communication.companyName }, ...companies];
+  const companyOptions = useMemo(
+    () =>
+      companies.some((company) => company.id === values.companyId)
+        ? companies
+        : [{ id: communication.companyId, name: communication.companyName }, ...companies],
+    [companies, values.companyId, communication.companyId, communication.companyName],
+  );
+
+  const companySelectOptions = useMemo<SearchSelectOption[]>(
+    () => companyOptions.map((company) => ({ value: company.id, label: company.name })),
+    [companyOptions],
+  );
 
   // Same for the user: an account that has since been deactivated stays
   // selectable rather than blanking the field of a record it already owns.
@@ -175,23 +185,19 @@ export function EditCommunicationForm({ communication }: { communication: Commun
             label="Εταιρεία"
             hint="Νέα εταιρεία δημιουργείται μόνο κατά την καταχώριση νέας επικοινωνίας."
           >
-            <select
-              required
+            <SearchSelect
+              options={companySelectOptions}
               value={values.companyId}
-              onChange={(event) => {
-                update('companyId', event.target.value);
+              onChange={(id) => {
+                update('companyId', id);
                 // The name field belongs to whichever company is selected.
                 setNameDraft(undefined);
                 setTakenName(undefined);
               }}
-              className={controlClass}
-            >
-              {companyOptions.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
+              searchPlaceholder="Αναζήτηση εταιρείας…"
+              searchLabel="Αναζήτηση εταιρείας"
+              emptyLabel="Δεν βρέθηκε εταιρεία."
+            />
           </Field>
           <Field
             label="Επωνυμία"
