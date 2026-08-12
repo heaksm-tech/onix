@@ -34,6 +34,11 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+/** App pages reached outside the primary sidebar, but still named in the breadcrumb. */
+const UTILITY_TRAILS: { href: Route; labels: string[] }[] = [
+  { href: '/account/password', labels: ['Λογαριασμός', 'Αλλαγή κωδικού'] },
+];
+
 export function isActive(pathname: string, href: string): boolean {
   if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -41,6 +46,9 @@ export function isActive(pathname: string, href: string): boolean {
 
 /** Labels from section down to the current page, for the topbar breadcrumb. */
 export function breadcrumbTrail(pathname: string): string[] {
+  const utility = UTILITY_TRAILS.find(({ href }) => isActive(pathname, href));
+  if (utility) return utility.labels;
+
   for (const item of NAV_ITEMS) {
     if (item.children) {
       const child = item.children.find((sub) => isActive(pathname, sub.href));

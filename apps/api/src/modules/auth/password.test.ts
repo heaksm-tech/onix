@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { hashPassword, verifyPassword } from './password.js';
+import { hashPassword, passwordsMatch, verifyPassword } from './password.js';
 
 describe('password hashing', () => {
   it('verifies the password it hashed', async () => {
@@ -39,5 +39,10 @@ describe('password hashing', () => {
     for (const stored of ['', 'not-a-hash', 'scrypt$16384$8$1$onlyfiveparts', 'bcrypt$a$b$c$d$e']) {
       await expect(verifyPassword('whatever', stored)).resolves.toBe(false);
     }
+  });
+
+  it('compares repeated passwords through the same Unicode normalisation as hashing', () => {
+    expect(passwordsMatch('\u0386λφα', '\u0391\u0301λφα')).toBe(true);
+    expect(passwordsMatch('πρώτος', 'δεύτερος')).toBe(false);
   });
 });

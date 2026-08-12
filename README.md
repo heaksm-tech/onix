@@ -245,6 +245,51 @@ Sessions are rows in the `sessions` table, referenced by an httpOnly cookie, so
 signing out or deactivating a user takes effect on the next request. They last
 `SESSION_TTL_DAYS` (14 by default).
 
+### Changing your own password
+
+Every role can change its password from the account menu at the top right. The
+form asks for the current password and the replacement twice; a successful
+change keeps that browser signed in and closes every other session belonging to
+the account. A confirmation is then sent through Resend without ever including
+the password itself.
+
+The two seeded accounts are still restored to the committed first-login
+passwords whenever `npm run db:seed` (or `make prod-seed`) runs. That command is
+the deliberate recovery path, so do not run it as routine application startup
+after changing either seeded password.
+
+#### Resend in development and production
+
+Create a Resend API key and put it in the environment used by the API:
+
+```env
+RESEND_API_KEY=re_...
+```
+
+`NODE_ENV` selects the delivery mode:
+
+| Environment | Sender | Recipient |
+| ----------- | ------ | --------- |
+| Development | `Onix CRM <onboarding@resend.dev>` | `RESEND_DEV_TO` |
+| Production | `Onix CRM <RESEND_FROM_EMAIL>` | The account's email |
+
+Development defaults `RESEND_DEV_TO` to
+`delivered+password-change@resend.dev`, which safely simulates delivery and is
+visible in the Resend dashboard. To receive the message in your own inbox, set
+it to the email address attached to your Resend account; Resend's test domain
+cannot send to arbitrary recipients.
+
+For production, add and verify your domain (or sending subdomain) in Resend,
+then set an address at that exact domain:
+
+```env
+RESEND_FROM_EMAIL=security@notifications.your-domain.gr
+```
+
+The production compose file requires both values, and API startup validates
+them again. Development remains usable without a key, but the password form
+will state that the password changed without its email notification.
+
 ### What an unauthenticated visitor can reach
 
 Nothing but the login screen. Signing in is the gate for the application code
@@ -427,9 +472,10 @@ onix/
 Two files, both gitignored, both created by `npm run setup` from a committed
 `.example`:
 
-- `apps/api/.env` — `DATABASE_URL`, `PORT`, `LOG_LEVEL`, `CORS_ORIGIN`. Validated
+- `apps/api/.env` — database, server, session and Resend configuration. Validated
   at boot with zod, so a bad value fails immediately with a readable message
-  rather than at the first request.
+  rather than at the first request. Resend credentials are optional in
+  development and required in production.
 - `apps/web/.env.local` — `API_URL`, and nothing else. It is read server-side
   only; browser code calls the web app's own `/api/v1` route, so the API's
   address is never inlined into the client bundle.

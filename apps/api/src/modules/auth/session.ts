@@ -21,7 +21,8 @@ export const SESSION_COOKIE = 'onix_session';
 const TOKEN_BYTES = 32;
 const ttlMs = env.SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
-function hashToken(token: string): string {
+/** Database representation of a browser session token. */
+export function hashSessionToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
@@ -69,7 +70,7 @@ export async function createSession(userId: string): Promise<{ token: string; ex
 
   await query('INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)', [
     userId,
-    hashToken(token),
+    hashSessionToken(token),
     expiresAt,
   ]);
 
@@ -88,13 +89,13 @@ export async function resolveSession(token: string): Promise<AuthUser | undefine
       WHERE s.token_hash = $1
         AND s.expires_at > now()
         AND u.active`,
-    [hashToken(token)],
+    [hashSessionToken(token)],
   );
 }
 
 /** Drop a single session. Silently does nothing if it is already gone. */
 export async function revokeSession(token: string): Promise<void> {
-  await query('DELETE FROM sessions WHERE token_hash = $1', [hashToken(token)]);
+  await query('DELETE FROM sessions WHERE token_hash = $1', [hashSessionToken(token)]);
 }
 
 /**

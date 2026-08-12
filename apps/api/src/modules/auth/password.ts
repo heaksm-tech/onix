@@ -12,9 +12,10 @@ import { promisify } from 'node:util';
  */
 
 /**
- * The shortest password an account may be given. Enforced by the tools that
- * set passwords — `user:create` and the seed — rather than at sign-in, where a
- * length check would only leak how long the real password is.
+ * The shortest password an account may be given. Enforced by every flow that
+ * sets passwords — `user:create`, the seed and the signed-in account form —
+ * rather than at sign-in, where a length check would only leak how long the
+ * real password is.
  */
 export const MIN_PASSWORD_LENGTH = 12;
 
@@ -39,6 +40,11 @@ const MAX_MEMORY = 64 * 1024 * 1024;
  */
 function normalize(password: string): Buffer {
   return Buffer.from(password.normalize('NFKC'), 'utf8');
+}
+
+/** Compare the two entries of a new password through the same normalisation as hashing. */
+export function passwordsMatch(first: string, second: string): boolean {
+  return first.normalize('NFKC') === second.normalize('NFKC');
 }
 
 async function derive(
