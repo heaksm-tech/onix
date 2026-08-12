@@ -20,7 +20,7 @@ export function Topbar({ user }: { user: AuthUser }) {
 
       <nav aria-label="Διαδρομή" className="flex min-w-0 items-center gap-1.5 text-sm">
         <span className="hidden text-ink-faint sm:inline">Workspace</span>
-        {breadcrumbTrail(pathname).map((label, index, trail) => (
+        {breadcrumbTrail(pathname, user.role).map((label, index, trail) => (
           <Fragment key={label}>
             <span className={cn('text-ink-faint/60', index === 0 && 'hidden sm:inline')}>/</span>
             <span

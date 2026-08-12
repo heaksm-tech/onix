@@ -128,7 +128,7 @@ export function MobileNav({ user }: { user: AuthUser }) {
               </div>
 
               <nav className="mt-4 flex flex-1 flex-col gap-0.5 overflow-y-auto px-3">
-                <NavList pathname={pathname} onNavigate={() => setOpen(false)} />
+                <NavList pathname={pathname} role={user.role} onNavigate={() => setOpen(false)} />
               </nav>
 
               <div className="flex flex-col px-3 pb-4">

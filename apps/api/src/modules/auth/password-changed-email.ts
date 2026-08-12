@@ -1,5 +1,8 @@
-import { env } from '../../config/env.js';
-import { sendEmail } from '../../lib/resend.js';
+import {
+  sendEmail,
+  transactionalEmailRecipient,
+  transactionalEmailSender,
+} from '../../lib/resend.js';
 
 const OFFICE_TIME_ZONE = 'Europe/Athens';
 
@@ -31,13 +34,6 @@ export async function sendPasswordChangedEmail({
   changedAt: Date;
 }): Promise<boolean> {
   const time = changedAtFormat.format(changedAt);
-  const recipient = env.isProduction ? email : env.resendDevTo;
-  // Production startup validation guarantees this value. The fallback keeps
-  // the type honest and is never used there.
-  const productionSender = env.resendFromEmail ?? 'onboarding@resend.dev';
-  const sender = env.isProduction
-    ? `Onix CRM <${productionSender}>`
-    : 'Onix CRM <onboarding@resend.dev>';
 
   const text = `Γεια σας ${name},
 
@@ -46,8 +42,8 @@ export async function sendPasswordChangedEmail({
 Αν δεν κάνατε εσείς αυτή την αλλαγή, επικοινωνήστε αμέσως με τον διαχειριστή του Onix CRM.`;
 
   return sendEmail({
-    from: sender,
-    to: recipient,
+    from: transactionalEmailSender(),
+    to: transactionalEmailRecipient(email),
     subject: 'Ο κωδικός πρόσβασής σας άλλαξε',
     text,
     html: `<p>Γεια σας ${escapeHtml(name)},</p>

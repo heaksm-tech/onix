@@ -36,8 +36,12 @@ services:
       # Empty: no browser calls this API cross-origin. See apps/api/.env.example.
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-14}
-      # Development uses Resend's test sender and never addresses the account
-      # whose password changed; see .env.example for the safe default recipient.
+      # Public browser origin used in invitation emails. If WEB_PORT changes,
+      # set APP_URL alongside it so the link still reaches the web service.
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      ACCOUNT_INVITATION_TTL_HOURS: ${ACCOUNT_INVITATION_TTL_HOURS:-48}
+      # Development uses Resend's test sender and traps every message at the
+      # safe recipient below; see .env.example.
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_DEV_TO: ${RESEND_DEV_TO:-delivered+password-change@resend.dev}
     ports:

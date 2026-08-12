@@ -58,6 +58,32 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Διαχειριστής',
 };
 
+/** Roles allowed to administer accounts and create invitations. */
+export const ACCOUNT_MANAGER_ROLES = ['technical', 'admin'] as const satisfies readonly UserRole[];
+export const ACCOUNT_CREATOR_ROLES = ACCOUNT_MANAGER_ROLES;
+export type AccountCreatorRole = (typeof ACCOUNT_CREATOR_ROLES)[number];
+
+/** Roles that may be assigned through the app; admin stays CLI-only. */
+export const INVITABLE_ROLES = [
+  'technical',
+  'manager',
+  'employee',
+] as const satisfies readonly UserRole[];
+export type InvitableRole = (typeof INVITABLE_ROLES)[number];
+
+export function canCreateAccounts(role: UserRole): role is AccountCreatorRole {
+  return ACCOUNT_CREATOR_ROLES.some((allowed) => allowed === role);
+}
+
+export function canManageAccounts(role: UserRole): role is AccountCreatorRole {
+  return ACCOUNT_MANAGER_ROLES.some((allowed) => allowed === role);
+}
+
+/** Roles that work across every user's communications rather than only their own. */
+export function canViewAllCommunications(role: UserRole): boolean {
+  return role === 'admin' || role === 'technical';
+}
+
 /**
  * Initials for the avatar: first letters of the first two words, so
  * «Σοφία Δ. Μελά» reads ΣΔ rather than a single letter.

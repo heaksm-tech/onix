@@ -1,7 +1,8 @@
 import type { Route } from 'next';
 import type { ComponentType } from 'react';
 
-import { IconCompanies, IconDashboard, type IconProps } from '@/components/icons';
+import { IconCompanies, IconContacts, IconDashboard, type IconProps } from '@/components/icons';
+import { ACCOUNT_MANAGER_ROLES, canViewAllCommunications, type UserRole } from '@/lib/session';
 
 export type NavSubItem = {
   label: string;
@@ -11,6 +12,7 @@ export type NavSubItem = {
 type NavItemBase = {
   label: string;
   icon: ComponentType<IconProps>;
+  roles?: readonly UserRole[];
 };
 
 /** A leaf navigates to its page. */
@@ -32,6 +34,15 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Όλες οι επικοινωνίες', href: '/companies/communications' },
     ],
   },
+  {
+    label: 'Λογαριασμοί',
+    icon: IconContacts,
+    roles: ACCOUNT_MANAGER_ROLES,
+    children: [
+      { label: 'Όλοι οι λογαριασμοί', href: '/accounts' },
+      { label: 'Νέος λογαριασμός', href: '/accounts/new' },
+    ],
+  },
 ];
 
 /** App pages reached outside the primary sidebar, but still named in the breadcrumb. */
@@ -44,12 +55,28 @@ export function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** Navigation is presentation only; the page and API repeat the role check. */
+export function navItemsFor(role: UserRole): NavItem[] {
+  return NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(role)).map((item) => {
+    if (canViewAllCommunications(role) || !item.children) return item;
+
+    return {
+      ...item,
+      children: item.children.map((child) =>
+        child.href === '/companies/communications'
+          ? { ...child, label: 'Οι επικοινωνίες μου' }
+          : child,
+      ),
+    };
+  });
+}
+
 /** Labels from section down to the current page, for the topbar breadcrumb. */
-export function breadcrumbTrail(pathname: string): string[] {
+export function breadcrumbTrail(pathname: string, role: UserRole): string[] {
   const utility = UTILITY_TRAILS.find(({ href }) => isActive(pathname, href));
   if (utility) return utility.labels;
 
-  for (const item of NAV_ITEMS) {
+  for (const item of navItemsFor(role)) {
     if (item.children) {
       const child = item.children.find((sub) => isActive(pathname, sub.href));
       if (child) return [item.label, child.label];

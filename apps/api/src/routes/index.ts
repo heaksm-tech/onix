@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { requireAuth } from '../middleware/require-auth.js';
+import { accountsRouter } from '../modules/accounts/router.js';
 import { authRouter } from '../modules/auth/router.js';
 import { communicationsRouter } from '../modules/communications/router.js';
 import { companiesRouter } from '../modules/companies/router.js';
@@ -15,5 +16,6 @@ apiRouter.use(authRouter);
 
 // Everything past this point requires a session.
 apiRouter.use(requireAuth);
+apiRouter.use(accountsRouter);
 apiRouter.use(companiesRouter);
 apiRouter.use(communicationsRouter);

@@ -5,7 +5,14 @@ import { useState } from 'react';
 
 import { IconChevronRight } from '@/components/icons';
 import { cn } from '@/lib/cn';
-import { NAV_ITEMS, isActive, type NavGroupItem, type NavItem, type NavLeafItem } from '@/lib/nav';
+import {
+  isActive,
+  navItemsFor,
+  type NavGroupItem,
+  type NavItem,
+  type NavLeafItem,
+} from '@/lib/nav';
+import type { UserRole } from '@/lib/session';
 
 /**
  * The workspace nav rows, rendered identically by the desktop sidebar and the
@@ -13,7 +20,7 @@ import { NAV_ITEMS, isActive, type NavGroupItem, type NavItem, type NavLeafItem 
  * followed — including a tap on the page already open, where the pathname
  * never changes.
  */
-type NavProps = { pathname: string; onNavigate?: () => void };
+type NavProps = { pathname: string; role: UserRole; onNavigate?: () => void };
 
 function NavLeaf({ item, pathname, onNavigate }: NavProps & { item: NavLeafItem }) {
   const Icon = item.icon;
@@ -129,7 +136,7 @@ export function NavList(props: NavProps) {
       <p className="px-2.5 pb-1.5 text-[11px] font-medium tracking-wider text-ink-faint uppercase">
         Workspace
       </p>
-      {NAV_ITEMS.map((item) => (
+      {navItemsFor(props.role).map((item) => (
         <NavEntry key={item.label} item={item} {...props} />
       ))}
     </>
