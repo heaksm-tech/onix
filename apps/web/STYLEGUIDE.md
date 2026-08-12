@@ -242,15 +242,20 @@ both render from it.
 **One nav, two shells.** The rows live in `NavList`; `Sidebar` renders them in
 the permanent column from `md` up, and `MobileNav` renders the same list in a
 drawer below `md`, opened by the topbar's menu button (the only chrome on the
-left at that width — the compact logo moved into the drawer header). The drawer
-stays mounted so it animates both ways: `inert` is what removes it from the tab
-order and the a11y tree while closed, `pointer-events-none` keeps the closed
-backdrop from swallowing taps. It closes on backdrop tap, on `Escape`, on the
-close button and on any navigation — including a tap on the page already open,
-which is why `NavList` takes an `onNavigate` callback rather than relying on
-the pathname changing. Opening moves focus to the close button and locks body
-scroll; closing by any route other than navigation returns focus to the
-trigger.
+left at that width — the compact logo moved into the drawer header). The
+full-screen portal is mounted **only while open**. Never leave a closed fixed
+layer above the application and rely on `inert` or `pointer-events-none` to
+pass taps through: iOS WebKit has allowed that layer to swallow the entire
+Dashboard. It closes on backdrop tap, on `Escape`, on the close button and on
+any navigation — including a tap on the page already open, which is why
+`NavList` takes an `onNavigate` callback rather than relying on the pathname
+changing. Opening moves focus to the close button and locks body scroll;
+closing by any route other than navigation returns focus to the trigger.
+
+**Role-filtered sections.** A role restriction belongs on the item in
+`nav.ts`; `navItemsFor()` is the single filter used by both shells and the
+breadcrumb. This only controls what is shown. Every restricted page repeats
+the role check on the server, and Express remains the authoritative boundary.
 
 Routes live under the `(app)` route group so every section inherits the shell:
 
@@ -329,26 +334,88 @@ default); in production it sends from `RESEND_FROM_EMAIL` at the verified domain
 to the account's own email. `NODE_ENV` chooses the branch. No Resend key or
 sender address may enter the web package or a `NEXT_PUBLIC_*` value.
 
-### The anonymous perimeter
+### Account invitations
 
-`proxy.ts` serves a visitor without a session exactly two things: the login
-document and the endpoint it posts to. Pages redirect to `/login`; everything
-else — API routes, RSC payloads, **and every JavaScript chunk** — gets a flat 404. The bundles name every endpoint and screen the app has, so handing them to
-an anonymous visitor hands over a map of the API.
+`/accounts/new` is a primary-navigation child available only to `admin` and
+`technical`. The same two roles are enforced in its server page and on
+`POST /account-invitations`; navigation visibility alone is never a
+permission. Its select reads the shared `INVITABLE_ROLES` and `ROLE_LABELS`, so
+`admin` cannot accidentally appear as an assignable role.
 
-That works only because **the login page ships no JavaScript**:
+An invitation creates an inactive user with no password and emails a
+single-use token. Only the SHA-256 of that token is stored. Sending again
+rotates the token; accepting it records `accepted_at`, activates the account,
+creates its first session in the same transaction, and redirects into the app.
+The email is essential to this operation, so a delivery failure is reported as
+a retryable error rather than as a successful invitation.
 
-- `login-form.tsx` is a server component rendering a native
-  `<form method="post">`. It must stay that way. Adding `'use client'` anywhere
-  under `/login` leaves the page rendering but never hydrating.
-- Its CSS is inlined via `experimental.inlineCss`, so the document is
-  self-contained in production.
-- A failed sign-in is a redirect carrying an error **code**, mapped to Greek
-  copy by `loginErrorMessage()`. Never put an API message in the URL.
+`/activate-account` lives in `(auth)` and follows the login architecture: it is
+a normal Next page with a native form, errors cross the redirect as safe codes,
+and no API message is placed in the URL. Its metadata sets a `no-referrer`
+policy because the query string contains the bearer token.
 
-Stylesheets are the one carve-out — they expose no endpoint, and the login page
-already inlines the same rules. If you add a section, nothing here needs
-touching: `(app)` pages and their chunks are covered by default.
+### Account administration
+
+`/accounts` is the other child of the role-filtered **Λογαριασμοί** group. Like
+invitations, it repeats the `admin` / `technical` check in the server page and
+on every Express endpoint. The list is server-rendered, pages through 20
+accounts with `?page=`, and gives only its row actions to a client component.
+
+Account state has three visible labels: active, blocked, and waiting for
+activation. An active account offers only «Αποκλεισμός». Once inactive,
+«Διαγραφή» appears; an activated account also offers «Άρση αποκλεισμού».
+Every one of these actions asks through `ConfirmDialog`, including the
+reversible ones, because they change someone's access.
+
+The API is stricter than the buttons: active accounts cannot be deleted, an
+operator cannot act on their own account, and a `technical` account cannot act
+on an `admin`. Blocking removes every session before it returns. Permanent
+deletion relies on `communications.user_id ON DELETE SET NULL`; communication
+lists, details and Dashboard panels use a left join and render a missing author
+as «Διαγραμμένος χρήστης» rather than dropping the historical record.
+
+### Authentication
+
+Use the conventional Next/React boundary. There is deliberately no
+`proxy.ts`, middleware asset gate, cookie-dependent chunk response, standalone
+HTML renderer, cache purge or deployment cache-buster.
+
+- `(auth)/login/page.tsx` and `(auth)/activate-account/page.tsx` are normal Next
+  pages. Their native forms POST to route handlers and receive a redirect with
+  a safe error code when necessary.
+- The `(app)` server layout calls `getCurrentUser()` and redirects to login
+  when the session is absent or invalid. This protects every page below it.
+- Browser calls go through `/api/v1/*`; that route only forwards. Express
+  performs authentication and role authorization for protected data.
+- Next framework assets are served normally and never depend on a session.
+
+Do not reintroduce a web perimeter that serves different framework responses
+according to cookie presence. If you add a section below `(app)`, the layout
+and Express authorization patterns cover it.
+
+### Communication ownership
+
+All roles may create communications. `admin` and `technical` use the shared
+workspace: their Dashboard and communication routes include every author, and
+their forms retain the author select. Admins may choose every active account;
+technicians see only active non-admin accounts, and Express enforces the same
+rule on submitted `userId` values. The «Καταχώριση από» field uses the shared
+`SearchSelect`, since the account list is expected to grow. Both shared
+overview pages render
+`CommunicationAccountFilter`, which uses `SearchSelect` and stores its author
+in `?userId=`. The Dashboard sends that id to every aggregate; list paging
+preserves it, while changing it removes `page` and begins the new result set at
+one. The empty-value option «Όλοι οι υπάλληλοι» removes the parameter.
+`manager` and `employee` use an ownership-scoped workspace: navigation and
+page headings say «Οι επικοινωνίες μου», and `CommunicationDetailsFields`
+renders their signed-in identity as a fixed value rather than a select.
+
+The UI is not the permission. Express applies the same role decision to the
+Dashboard aggregates, list, detail, update and delete queries, and rejects a
+restricted role that submits another `userId`. An out-of-scope detail id is a
+404, so a valid UUID never reveals whether another user's record exists. A
+restricted role that manually adds a filter id is still resolved to their own
+account by Express.
 
 ---
 
