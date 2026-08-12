@@ -1,5 +1,6 @@
 import { Card } from '@/components/card';
 import { Field, controlClass } from '@/components/field';
+import { SearchSelect } from '@/components/search-select';
 import { OUTCOMES, OUTCOME_LABELS, fromDateTimeLocal } from '@/lib/communications';
 
 /**
@@ -54,11 +55,14 @@ export function detailsPayload(values: CommunicationDetailsValues) {
 export function CommunicationDetailsFields({
   values,
   users,
+  fixedUser,
   disabled = false,
   onChange,
 }: {
   values: CommunicationDetailsValues;
   users: CommunicationUser[];
+  /** Restricted roles are always the author, so there is nothing to choose. */
+  fixedUser?: CommunicationUser;
   disabled?: boolean;
   onChange: (key: keyof CommunicationDetailsValues, value: string) => void;
 }) {
@@ -72,20 +76,27 @@ export function CommunicationDetailsFields({
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Καταχώριση από">
-          <select
-            required
-            disabled={disabled || users.length === 0}
-            value={values.userId}
-            onChange={(event) => onChange('userId', event.target.value)}
-            className={controlClass}
-          >
-            <option value="">Επιλέξτε χρήστη</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name} · {user.email}
-              </option>
-            ))}
-          </select>
+          {fixedUser ? (
+            <p className="flex h-9 items-center rounded-lg border border-line bg-surface px-3 text-sm text-ink-secondary shadow-card">
+              <span className="truncate">
+                {fixedUser.name} · {fixedUser.email}
+              </span>
+            </p>
+          ) : (
+            <SearchSelect
+              options={users.map((user) => ({
+                value: user.id,
+                label: `${user.name} · ${user.email}`,
+              }))}
+              value={values.userId}
+              onChange={(userId) => onChange('userId', userId)}
+              disabled={disabled || users.length === 0}
+              placeholder="Επιλέξτε χρήστη"
+              searchPlaceholder="Αναζήτηση χρήστη…"
+              searchLabel="Αναζήτηση χρήστη καταχώρισης"
+              emptyLabel="Δεν βρέθηκε χρήστης."
+            />
+          )}
         </Field>
         <Field label="Αποτέλεσμα">
           <select

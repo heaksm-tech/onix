@@ -6,13 +6,10 @@ import { LOGIN_PATH, safeNextPath, type LoginErrorCode } from '@/lib/session';
 /**
  * Target of the login form.
  *
- * The login page ships no JavaScript — an unauthenticated browser is served
- * nothing but the document itself — so this is a plain HTML form submission:
- * url-encoded in, redirect out. It is the one endpoint besides the login page
- * that `proxy.ts` lets through without a session.
+ * This is a plain HTML form submission: url-encoded in, redirect out.
  *
  * Express still does the real work. This handler exists to turn its JSON
- * answer into a redirect a browser can follow on its own, and to relay the
+ * answer into a redirect the browser can follow, and to relay the
  * session cookie so it lands on the web origin rather than the API's.
  */
 

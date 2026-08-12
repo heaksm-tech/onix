@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import type { Request, Response } from 'express';
+import type { PoolClient } from 'pg';
 
 import { env } from '../../config/env.js';
 import { query, queryOne } from '../../db/index.js';
@@ -63,16 +64,22 @@ export function readSessionCookie(req: Request): string | undefined {
   return undefined;
 }
 
-/** Issue a session for `userId` and return the token to hand to the browser. */
-export async function createSession(userId: string): Promise<{ token: string; expiresAt: Date }> {
+/**
+ * Issue a session for `userId` and return the token to hand to the browser.
+ * A transaction client is accepted by flows that activate an account and sign
+ * it in as one indivisible database change.
+ */
+export async function createSession(
+  userId: string,
+  client?: Pick<PoolClient, 'query'>,
+): Promise<{ token: string; expiresAt: Date }> {
   const token = randomBytes(TOKEN_BYTES).toString('base64url');
   const expiresAt = new Date(Date.now() + ttlMs);
 
-  await query('INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)', [
-    userId,
-    hashSessionToken(token),
-    expiresAt,
-  ]);
+  const statement = 'INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)';
+  const params = [userId, hashSessionToken(token), expiresAt];
+  if (client) await client.query(statement, params);
+  else await query(statement, params);
 
   return { token, expiresAt };
 }

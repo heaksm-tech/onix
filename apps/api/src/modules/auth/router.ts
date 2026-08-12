@@ -5,6 +5,7 @@ import { queryOne, transaction } from '../../db/index.js';
 import { HttpError } from '../../lib/http-error.js';
 import { requireAuth } from '../../middleware/require-auth.js';
 import { validate } from '../../middleware/validate.js';
+import { hashInvitationToken, INVITATION_TOKEN_MAX_LENGTH } from '../accounts/invitation-token.js';
 import { sendPasswordChangedEmail } from './password-changed-email.js';
 import {
   MIN_PASSWORD_LENGTH,
@@ -26,9 +27,9 @@ import {
 import type { AuthUser } from './types.js';
 
 /**
- * Account authentication and the signed-in user's own credentials. Accounts
- * are still created by an administrator with `npm run user:create`; there is
- * deliberately no registration endpoint.
+ * Account authentication and the signed-in user's own credentials. New users
+ * arrive through authorised invitations; there is deliberately no public
+ * registration endpoint.
  */
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -38,6 +39,8 @@ const IP_LIMIT = 30;
 const EMAIL_LIMIT = 8;
 /** A stolen signed-in browser must not become an unlimited current-password oracle. */
 const PASSWORD_CHANGE_LIMIT = 8;
+/** Public activation attempts per source address before a short cooling-off period. */
+const ACCOUNT_ACTIVATION_LIMIT = 30;
 
 const loginInput = z.object({
   email: z.string().trim().toLowerCase().min(1).max(320),
@@ -56,7 +59,16 @@ const changePasswordInput = z.object({
 
 type ChangePasswordInput = z.infer<typeof changePasswordInput>;
 
+const activateAccountInput = z.object({
+  token: z.string().trim().min(1).max(INVITATION_TOKEN_MAX_LENGTH),
+  password: z.string().min(MIN_PASSWORD_LENGTH).max(1024),
+  confirmation: z.string().min(1).max(1024),
+});
+
+type ActivateAccountInput = z.infer<typeof activateAccountInput>;
+
 type Credentials = AuthUser & { active: boolean; password_hash: string | null };
+type AccountInvitation = AuthUser & { invitation_id: string };
 
 /** One message for every failure mode, so nothing reveals which accounts exist. */
 const INVALID_CREDENTIALS = 'Λανθασμένο email ή κωδικός πρόσβασης.';
@@ -115,6 +127,112 @@ authRouter.post('/auth/login', validate(loginInput), async (req, res) => {
   await purgeExpiredSessions();
 
   res.json({ user });
+});
+
+authRouter.post('/auth/activate-account', validate(activateAccountInput), async (req, res) => {
+  const { token, password, confirmation } = req.body as ActivateAccountInput;
+  if (!passwordsMatch(password, confirmation)) {
+    throw new HttpError(
+      422,
+      'PASSWORD_CONFIRMATION_MISMATCH',
+      'Οι δύο καταχωρίσεις του κωδικού δεν συμφωνούν.',
+    );
+  }
+
+  const address = req.ip ?? 'unknown';
+  const limitKey = `account-activation:${address}`;
+  const limit = consume(limitKey, ACCOUNT_ACTIVATION_LIMIT, WINDOW_MS);
+  if (!limit.allowed) {
+    res.set('Retry-After', String(limit.retryAfterSeconds));
+    throw new HttpError(
+      429,
+      'TOO_MANY_ATTEMPTS',
+      'Πολλές προσπάθειες ενεργοποίησης. Δοκιμάστε ξανά σε λίγα λεπτά.',
+    );
+  }
+
+  const tokenHash = hashInvitationToken(token);
+  const invitation = await queryOne<AccountInvitation>(
+    `SELECT ai.id AS invitation_id, u.id, u.name, u.email, u.role
+       FROM account_invitations AS ai
+       JOIN users AS u ON u.id = ai.user_id
+      WHERE ai.token_hash = $1
+        AND ai.accepted_at IS NULL
+        AND ai.expires_at > now()
+        AND u.password_hash IS NULL
+        AND NOT u.active`,
+    [tokenHash],
+  );
+
+  if (!invitation) {
+    throw new HttpError(
+      400,
+      'INVITATION_INVALID',
+      'Ο σύνδεσμος πρόσκλησης δεν είναι έγκυρος ή έχει λήξει.',
+    );
+  }
+
+  // Hash only after a cheap token lookup, and before opening the transaction:
+  // scrypt is intentionally slow and must not hold invitation or user locks.
+  const passwordHash = await hashPassword(password);
+
+  const activated = await transaction(async (client) => {
+    // Re-read under locks: two submissions of the same one-time link may both
+    // pass the first lookup, but only the first one may activate the account.
+    const lockedResult = await client.query<AccountInvitation>(
+      `SELECT ai.id AS invitation_id, u.id, u.name, u.email, u.role
+         FROM account_invitations AS ai
+         JOIN users AS u ON u.id = ai.user_id
+        WHERE ai.token_hash = $1
+          AND ai.accepted_at IS NULL
+          AND ai.expires_at > now()
+          AND u.password_hash IS NULL
+          AND NOT u.active
+        FOR UPDATE OF ai, u`,
+      [tokenHash],
+    );
+    const locked = lockedResult.rows[0];
+    if (!locked) {
+      throw new HttpError(
+        400,
+        'INVITATION_INVALID',
+        'Ο σύνδεσμος πρόσκλησης δεν είναι έγκυρος ή έχει λήξει.',
+      );
+    }
+
+    const userResult = await client.query<AuthUser>(
+      `UPDATE users
+          SET password_hash = $2, active = true
+        WHERE id = $1
+          AND password_hash IS NULL
+          AND NOT active
+        RETURNING id, name, email, role`,
+      [locked.id, passwordHash],
+    );
+    const user = userResult.rows[0];
+    if (!user) {
+      throw new HttpError(
+        409,
+        'ACCOUNT_ACTIVATION_CONFLICT',
+        'Ο λογαριασμός ενεργοποιήθηκε ήδη από άλλη προσπάθεια.',
+      );
+    }
+
+    await client.query(
+      'UPDATE account_invitations SET accepted_at = now() WHERE id = $1 AND accepted_at IS NULL',
+      [locked.invitation_id],
+    );
+    await client.query('DELETE FROM sessions WHERE user_id = $1', [user.id]);
+    const session = await createSession(user.id, client);
+
+    return { user, session };
+  });
+
+  setSessionCookie(res, activated.session.token, activated.session.expiresAt);
+  reset(limitKey);
+  await purgeExpiredSessions();
+
+  res.json({ user: activated.user });
 });
 
 authRouter.post('/auth/logout', async (req, res) => {

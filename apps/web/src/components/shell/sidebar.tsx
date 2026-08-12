@@ -28,7 +28,7 @@ export function Sidebar({ user }: { user: AuthUser }) {
       </Link>
 
       <nav className="mt-4 flex flex-1 flex-col gap-0.5 overflow-y-auto px-3">
-        <NavList pathname={pathname} />
+        <NavList pathname={pathname} role={user.role} />
       </nav>
 
       <div className="flex flex-col px-3 pb-4">

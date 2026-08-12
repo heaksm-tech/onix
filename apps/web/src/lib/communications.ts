@@ -47,6 +47,15 @@ export function outcomeTone(outcome: string | null): string {
   return OUTCOME_TONES[key] ?? OUTCOME_TONES.unset;
 }
 
+/** A safe optional author id read from a page query string. */
+export function communicationUserFilter(value: string | string[] | undefined): string | undefined {
+  const first = Array.isArray(value) ? value[0] : value;
+  return first &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(first)
+    ? first
+    : undefined;
+}
+
 /** «3/5» — or a dash where no level was recorded. */
 export function interestLabel(level: number | null): string {
   return level === null ? '—' : `${level}/5`;
@@ -65,7 +74,7 @@ export type CommunicationListItem = {
   /** Settled by the database, which owns the clock the reminder was written against. */
   overdue: boolean;
   createdAt: string;
-  userId: string;
+  userId: string | null;
   userName: string;
 };
 

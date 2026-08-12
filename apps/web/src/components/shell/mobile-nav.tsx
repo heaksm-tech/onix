@@ -9,7 +9,6 @@ import { IconClose, IconMenu } from '@/components/icons';
 import { LogoMark } from '@/components/logo';
 import { NavList } from '@/components/shell/nav-list';
 import { UserCard } from '@/components/shell/user-card';
-import { cn } from '@/lib/cn';
 import type { AuthUser } from '@/lib/session';
 
 /** A store that never changes — it only reports which renderer is running. */
@@ -21,8 +20,9 @@ const onServer = () => false;
  * The navigation for viewports below `md`, where the sidebar is hidden: a
  * topbar button that slides the same nav in as a drawer.
  *
- * The drawer stays mounted so it can animate both ways; `inert` is what takes
- * it out of the tab order and the accessibility tree while it is closed.
+ * The full-screen layer only exists while the drawer is open. Do not keep an
+ * inert or pointer-transparent copy mounted: iOS WebKit has allowed that fixed
+ * layer to win hit testing and swallow every tap on the page underneath.
  *
  * It is portalled to `<body>` rather than left in the topbar: the header's
  * `backdrop-blur` makes it a containing block for fixed descendants, which
@@ -87,29 +87,16 @@ export function MobileNav({ user }: { user: AuthUser }) {
       </button>
 
       {mounted &&
+        open &&
         createPortal(
-          <div
-            inert={!open}
-            className={cn('fixed inset-0 z-50 md:hidden', !open && 'pointer-events-none')}
-          >
-            <div
-              aria-hidden
-              onClick={close}
-              className={cn(
-                'absolute inset-0 bg-ink/40 transition-opacity duration-200',
-                open ? 'opacity-100' : 'opacity-0',
-              )}
-            />
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div aria-hidden onClick={close} className="absolute inset-0 bg-ink/40" />
 
             <div
               role="dialog"
               aria-modal="true"
               aria-label="Πλοήγηση"
-              className={cn(
-                'absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-line bg-canvas',
-                'transition-transform duration-200',
-                open ? 'translate-x-0' : '-translate-x-full',
-              )}
+              className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-line bg-canvas"
             >
               <div className="mt-4 flex items-center gap-2.5 px-5">
                 <Link
@@ -141,7 +128,7 @@ export function MobileNav({ user }: { user: AuthUser }) {
               </div>
 
               <nav className="mt-4 flex flex-1 flex-col gap-0.5 overflow-y-auto px-3">
-                <NavList pathname={pathname} onNavigate={() => setOpen(false)} />
+                <NavList pathname={pathname} role={user.role} onNavigate={() => setOpen(false)} />
               </nav>
 
               <div className="flex flex-col px-3 pb-4">

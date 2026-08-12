@@ -2,18 +2,7 @@ import { Button } from '@/components/button';
 import { Field, controlClass } from '@/components/field';
 import { LOGIN_ACTION_PATH } from '@/lib/session';
 
-/**
- * A plain HTML form — no `'use client'`, no state, no handlers.
- *
- * This is what lets the app deny every `/_next/*` request to a visitor who is
- * not signed in: with nothing to hydrate, the page needs no chunk to work, so
- * none has to be served. The browser posts it natively and follows the
- * redirect that comes back.
- *
- * The cost is that a failed attempt is a round trip rather than an in-place
- * message, and the typed email is not carried back — see the route handler for
- * why that is deliberate.
- */
+/** Native form submission keeps credential handling simple and server-side. */
 export function LoginForm({ next, error }: { next: string; error?: string }) {
   return (
     <form method="post" action={LOGIN_ACTION_PATH} className="flex flex-col gap-4">

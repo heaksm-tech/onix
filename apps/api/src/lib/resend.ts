@@ -13,6 +13,19 @@ type Email = {
   idempotencyKey: string;
 };
 
+/** Sender selected once for every transactional email. */
+export function transactionalEmailSender(): string {
+  // Production startup validation guarantees this value. The fallback keeps
+  // the type honest and is never used there.
+  const productionSender = env.resendFromEmail ?? 'onboarding@resend.dev';
+  return env.isProduction ? `Onix CRM <${productionSender}>` : 'Onix CRM <onboarding@resend.dev>';
+}
+
+/** Development traps every message in the configured Resend test inbox. */
+export function transactionalEmailRecipient(actualRecipient: string): string {
+  return env.isProduction ? actualRecipient : env.resendDevTo;
+}
+
 /**
  * Send one transactional email through Resend's HTTP API.
  *

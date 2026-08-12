@@ -32,7 +32,7 @@ type FormValues = CommunicationDetailsValues & { companyId: string };
 function initialValues(communication: CommunicationDetail): FormValues {
   return {
     companyId: communication.companyId,
-    userId: communication.userId,
+    userId: communication.userId ?? '',
     outcome: communication.outcome ?? '',
     contactName: communication.contactName ?? '',
     contactRole: communication.contactRole ?? '',
@@ -43,13 +43,19 @@ function initialValues(communication: CommunicationDetail): FormValues {
   };
 }
 
-export function EditCommunicationForm({ communication }: { communication: CommunicationDetail }) {
+export function EditCommunicationForm({
+  communication,
+  fixedUser,
+}: {
+  communication: CommunicationDetail;
+  fixedUser?: CommunicationUser;
+}) {
   const router = useRouter();
   const detailHref = `/companies/communications/${communication.id}` as const;
 
   const [values, setValues] = useState<FormValues>(() => initialValues(communication));
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
-  const [users, setUsers] = useState<CommunicationUser[]>([]);
+  const [users, setUsers] = useState<CommunicationUser[]>(() => (fixedUser ? [fixedUser] : []));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
@@ -66,7 +72,9 @@ export function EditCommunicationForm({ communication }: { communication: Commun
   useEffect(() => {
     void Promise.all([
       apiFetch<{ companies: CompanyOption[] }>('/companies'),
-      apiFetch<{ users: CommunicationUser[] }>('/users'),
+      fixedUser
+        ? Promise.resolve({ users: [fixedUser] })
+        : apiFetch<{ users: CommunicationUser[] }>('/users'),
     ])
       .then(([companyData, userData]) => {
         setCompanies(companyData.companies);
@@ -74,7 +82,7 @@ export function EditCommunicationForm({ communication }: { communication: Commun
       })
       .catch(() => setError('Δεν ήταν δυνατή η φόρτωση των στοιχείων της φόρμας.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [fixedUser]);
 
   function update(key: keyof FormValues, value: string) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -96,11 +104,13 @@ export function EditCommunicationForm({ communication }: { communication: Commun
     [companyOptions],
   );
 
-  // Same for the user: an account that has since been deactivated stays
-  // selectable rather than blanking the field of a record it already owns.
-  const userOptions = users.some((user) => user.id === values.userId)
-    ? users
-    : [{ id: communication.userId, name: communication.userName, email: '—' }, ...users];
+  // Same for a deactivated user: the existing author stays selectable. A
+  // permanently deleted author has no id to preserve, so saving the record
+  // requires choosing one of the active accounts instead.
+  const userOptions =
+    !communication.userId || users.some((user) => user.id === values.userId)
+      ? users
+      : [{ id: communication.userId, name: communication.userName, email: '—' }, ...users];
 
   const storedName =
     companyOptions.find((company) => company.id === values.companyId)?.name ??
@@ -219,6 +229,7 @@ export function EditCommunicationForm({ communication }: { communication: Commun
       <CommunicationDetailsFields
         values={values}
         users={userOptions}
+        fixedUser={fixedUser}
         disabled={loading}
         onChange={update}
       />

@@ -1,33 +1,32 @@
 import type { Route } from 'next';
 
 /**
- * Session facts shared by the server, the proxy and client components.
+ * Session facts shared by server and client components.
  *
  * Deliberately free of any server-only import (`next/headers`, the API
- * client), so `proxy.ts` and `'use client'` components can both pull from it.
- * The server-side lookup lives in `lib/auth.ts`.
+ * client), so `'use client'` components can pull from it. The server-side
+ * lookup lives in `lib/auth.ts`.
  */
 
 /**
  * The cookie the API issues on sign-in. Cookie scope ignores the port, so a
  * cookie set by the API on one host is visible to the web app on the same host
- * — which is what lets the middleware see it at all.
+ * — which is what lets both sides of the Next app use it.
  */
 export const SESSION_COOKIE = 'onix_session';
 
-/** Where the proxy sends people who are not signed in. */
+/** Where the signed-in app layout sends people without a valid session. */
 export const LOGIN_PATH: Route = '/login';
 
-/** Where the login form posts. Reachable without a session, unlike the rest. */
+/** Where the login form posts. */
 export const LOGIN_ACTION_PATH = '/api/auth/login';
 
 /**
  * Why a sign-in attempt failed, as a short code carried in the URL.
  *
- * The login page renders without JavaScript, so the outcome of a POST has to
- * survive a redirect. Only these codes cross that gap — never the API's own
- * message — so nothing an attacker controls is ever echoed into the page, and
- * the copy stays in one place.
+ * The native form receives its outcome through a redirect. Only these codes
+ * cross that gap — never the API's own message — so nothing an attacker
+ * controls is echoed into the page, and the copy stays in one place.
  */
 export const LOGIN_ERRORS = {
   missing: 'Συμπληρώστε το email και τον κωδικό πρόσβασής σας.',
@@ -58,6 +57,32 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   technical: 'Τεχνικός',
   admin: 'Διαχειριστής',
 };
+
+/** Roles allowed to administer accounts and create invitations. */
+export const ACCOUNT_MANAGER_ROLES = ['technical', 'admin'] as const satisfies readonly UserRole[];
+export const ACCOUNT_CREATOR_ROLES = ACCOUNT_MANAGER_ROLES;
+export type AccountCreatorRole = (typeof ACCOUNT_CREATOR_ROLES)[number];
+
+/** Roles that may be assigned through the app; admin stays CLI-only. */
+export const INVITABLE_ROLES = [
+  'technical',
+  'manager',
+  'employee',
+] as const satisfies readonly UserRole[];
+export type InvitableRole = (typeof INVITABLE_ROLES)[number];
+
+export function canCreateAccounts(role: UserRole): role is AccountCreatorRole {
+  return ACCOUNT_CREATOR_ROLES.some((allowed) => allowed === role);
+}
+
+export function canManageAccounts(role: UserRole): role is AccountCreatorRole {
+  return ACCOUNT_MANAGER_ROLES.some((allowed) => allowed === role);
+}
+
+/** Roles that work across every user's communications rather than only their own. */
+export function canViewAllCommunications(role: UserRole): boolean {
+  return role === 'admin' || role === 'technical';
+}
 
 /**
  * Initials for the avatar: first letters of the first two words, so

@@ -1,11 +1,6 @@
 import { Card } from '@/components/card';
 
-/**
- * What a communications screen shows when the API did not answer.
- *
- * Same shape as the dashboard report's failure line: a negative dot, one
- * sentence, and no stack trace — the reader can only retry anyway.
- */
+/** A quiet, actionable failure state for a server-rendered data section. */
 export function LoadError({ children }: { children: string }) {
   return (
     <Card className="p-5">

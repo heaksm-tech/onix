@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { buttonClass } from '@/components/button';
 import { Card } from '@/components/card';
 import { DeleteCommunication } from '@/components/communications/delete-button';
-import { LoadError } from '@/components/communications/load-error';
+import { LoadError } from '@/components/load-error';
 import { PageHeader } from '@/components/page-header';
 import { cn } from '@/lib/cn';
 import { loadCommunication } from '@/lib/communication-record';

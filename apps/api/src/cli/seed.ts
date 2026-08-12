@@ -91,11 +91,10 @@ async function upsert(
 /**
  * Reduce the users table to the seeded accounts.
  *
- * Communications reference their author with ON DELETE RESTRICT, so deleting a
- * user who has logged one is refused by the database — correctly, since that
- * history is the point of the CRM. They are reassigned to the administrator
- * first: the account that logged them is going away either way, and losing the
- * communication with it would be far worse than losing its attribution.
+ * Normal account deletion keeps communications and clears their author. A
+ * full seed reset is different: it deliberately reassigns those records to the
+ * restored administrator first, preserving the long-standing recovery
+ * behavior and avoiding anonymous history after a local reset.
  *
  * Sessions are cleared for everyone, seeded accounts included. Their passwords
  * were just rewritten, and a cookie that outlives the password it was issued

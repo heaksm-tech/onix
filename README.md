@@ -4,8 +4,8 @@ Internal B2B CRM for S. D. Melas Trading Business, managing company records, emp
 
 ## Stack
 
-| Layer    | Technology                                       |
-| -------- | ------------------------------------------------ |
+| Layer    | Technology                                        |
+| -------- | ------------------------------------------------- |
 | Frontend | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
 | Backend  | Node.js 22, Express 5, TypeScript                 |
 | Database | PostgreSQL 14+, `pg`, node-pg-migrate             |
@@ -152,6 +152,12 @@ That is the whole setup.
 Open http://localhost:3000. The app requires a sign-in, so you land on
 http://localhost:3000/login.
 
+Cloudflare Quick Tunnels are also supported while the Next.js development
+server is running. Their generated `*.trycloudflare.com` hostnames are allowed
+in `apps/web/next.config.ts`, so development scripts and the hot-reload
+WebSocket are accepted through the tunnel. Restart `npm run dev` after changing
+that configuration.
+
 `npm run setup` is safe to re-run at any time. It never overwrites an existing
 `.env` and never drops a database.
 
@@ -159,8 +165,10 @@ http://localhost:3000/login.
 
 ## 2a. Accounts and sign-in
 
-The CRM is sign-in only — there is no registration page. Accounts are created
-from the command line.
+The CRM is sign-in only — there is no public registration page. Signed-in
+administrators and technicians invite new accounts from the application;
+bootstrap, recovery and administrator accounts remain available from the
+command line.
 
 ### The two seeded accounts
 
@@ -201,11 +209,59 @@ deleted with it — the author is going away either way, and the record of the
 call is worth more than its attribution. The command prints every account it
 removed and how many communications it moved.
 
-### A real account
+### Creating accounts
 
-For anyone else, use the interactive script. It prompts for the password (never
-taken from a flag, so it stays out of your shell history) and requires at least
-12 characters:
+An administrator or technician opens **Λογαριασμοί → Νέος λογαριασμός**, enters
+an email and assigns `technical`, `manager` or `employee`. `admin` is
+deliberately not offered. The recipient gets a one-time link, chooses the
+password twice and is signed in as soon as the account is activated. Until
+then the pending account is inactive and cannot sign in normally.
+
+Sending an invitation again rotates its token, so the earlier link stops
+working. Links expire after `ACCOUNT_INVITATION_TTL_HOURS` (48 by default), and
+the database stores only a SHA-256 of the token rather than the value carried
+in the email.
+
+### Managing accounts
+
+Administrators and technicians open **Λογαριασμοί → Όλοι οι λογαριασμοί** to
+see accounts in pages of 20. Blocking and unblocking always ask for
+confirmation. Blocking revokes every session for that account immediately;
+unblocking restores sign-in with its existing password but does not restore
+the old sessions.
+
+Permanent deletion is deliberately a second step: it is offered only after an
+account is inactive, and the API rejects deletion of an active account even if
+called directly. A user cannot block or delete their own account, and a
+technician cannot alter the CLI-only `admin` role.
+
+Deletion removes the user, sessions and invitation permanently. Communications
+remain in place; their author reference becomes `NULL` and every communication
+screen renders it as «Διαγραμμένος χρήστης».
+
+### Communication visibility by role
+
+Every signed-in role can create communications. Administrators and technicians
+work in the shared view and retain the author selector. An administrator may
+assign any active account; a technician may assign any active non-admin account.
+The API repeats that distinction, so changing the submitted `userId` cannot
+make a technician record work under an administrator.
+Their Dashboard and communication list include a searchable account filter;
+the selected author is stored in `?userId=` and applies to the entire report or
+the paginated list. The filter options include existing accounts that own at
+least one visible communication, even when an account is currently blocked.
+Managers and employees work only with their own records: the author is fixed to
+their signed-in account, and their Dashboard, list, detail, edit and delete
+requests are all filtered by that user id in the API.
+
+The web interface reflects the same boundary with «Οι επικοινωνίες μου» and a
+non-editable author field, but those controls are presentation only. Express
+also rejects cross-user assignment and returns no record for another user's
+communication id.
+
+The interactive script remains the bootstrap and recovery path, and the only
+way to create a new `admin`. It prompts for the password (never taken from a
+flag, so it stays out of shell history) and requires at least 12 characters:
 
 ```bash
 npm run user:create
@@ -217,8 +273,9 @@ Everything it does not get as a flag it asks for:
 npm run user:create -- --email anna@melas.gr --name "Άννα Μελά" --role admin
 ```
 
-Roles are `employee`, `manager`, `technical`, `admin`. Running it against an
-existing email sets a new password for that account and reactivates it.
+Roles are `employee`, `manager`, `technical`, `admin`. Running the script
+against an existing email sets a new password for that account and reactivates
+it.
 
 ### On the production stack
 
@@ -260,7 +317,9 @@ after changing either seeded password.
 
 #### Resend in development and production
 
-Create a Resend API key and put it in the environment used by the API:
+Account invitations and password-change notifications share the same Resend
+boundary. Create a Resend API key and put it in the environment used by the
+API:
 
 ```env
 RESEND_API_KEY=re_...
@@ -268,10 +327,10 @@ RESEND_API_KEY=re_...
 
 `NODE_ENV` selects the delivery mode:
 
-| Environment | Sender | Recipient |
-| ----------- | ------ | --------- |
-| Development | `Onix CRM <onboarding@resend.dev>` | `RESEND_DEV_TO` |
-| Production | `Onix CRM <RESEND_FROM_EMAIL>` | The account's email |
+| Environment | Sender                             | Recipient           |
+| ----------- | ---------------------------------- | ------------------- |
+| Development | `Onix CRM <onboarding@resend.dev>` | `RESEND_DEV_TO`     |
+| Production  | `Onix CRM <RESEND_FROM_EMAIL>`     | The account's email |
 
 Development defaults `RESEND_DEV_TO` to
 `delivered+password-change@resend.dev`, which safely simulates delivery and is
@@ -286,38 +345,32 @@ then set an address at that exact domain:
 RESEND_FROM_EMAIL=security@notifications.your-domain.gr
 ```
 
-The production compose file requires both values, and API startup validates
-them again. Development remains usable without a key, but the password form
-will state that the password changed without its email notification.
+Invitation links also need the public origin of the web app:
 
-### What an unauthenticated visitor can reach
+```env
+APP_URL=https://crm.your-domain.gr
+```
 
-Nothing but the login screen. Signing in is the gate for the application code
-itself, not only for its data:
+The production compose file requires `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and
+`APP_URL`, and API startup validates them again. Development remains usable
+without a key: password changes report the missing notification, while an
+invitation stays pending and the form asks the sender to retry delivery.
 
-| Request                          | Without a session                |
-| -------------------------------- | -------------------------------- |
-| `/`, `/companies/*`, any page    | redirect to `/login`             |
-| RSC payloads for those pages     | redirect, no content             |
-| `/_next/static/**` JavaScript    | `404`                            |
-| `/api/v1/*` (including unknown paths) | `404`                       |
-| `/login`, its form, the icon     | served                           |
-| Stylesheets                      | served — no endpoints in them     |
+### Authentication boundary
 
-The client bundles name every endpoint the app calls, so they are withheld from
-anyone who has not signed in. Two design consequences follow, and both matter
-if you change this area:
+Authentication follows the conventional Next/React model. Login and account
+activation are normal pages, and Next serves its JavaScript, CSS and other
+framework assets without consulting the session. There is no web middleware
+or proxy that changes a response according to cookie presence.
 
-- **The login page ships no JavaScript.** Its form is plain HTML and its CSS is
-  inlined into the document. Adding a client component to it would leave the
-  page rendering but not working.
-- **The browser never addresses the API.** It calls this app's own `/api/v1/*`
-  route, which forwards to Express; the API's address is server-side only.
-  There is no `NEXT_PUBLIC_API_URL` to set, and `docker-compose.prod.yml` does
-  not publish the API's port at all.
+Signed-in pages live below the `(app)` layout. That server layout resolves the
+session through `GET /auth/me` and redirects to `/login` when it is missing or
+invalid. Browser API calls use the same-origin `/api/v1/*` forwarding route;
+Express remains the authoritative permission boundary and answers protected
+requests without a valid session with `401`.
 
-In development the login page does not hot-reload while you are signed out —
-its scripts are blocked like everything else. Sign in and it behaves normally.
+The API address stays server-side only. There is no `NEXT_PUBLIC_API_URL` to
+set, and `docker-compose.prod.yml` does not publish the API port.
 
 ---
 

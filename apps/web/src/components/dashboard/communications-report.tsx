@@ -16,11 +16,12 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-export async function CommunicationsReport() {
+export async function CommunicationsReport({ userId }: { userId?: string }) {
   let summary: CommunicationsSummary;
 
   try {
-    summary = await apiFetchAsUser<CommunicationsSummary>('/communications/summary');
+    const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+    summary = await apiFetchAsUser<CommunicationsSummary>(`/communications/summary${query}`);
   } catch {
     return (
       <ReportCard title="Αναφορά επικοινωνιών">

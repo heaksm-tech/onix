@@ -10,6 +10,18 @@ const optionalEmail = z.preprocess(
   z.string().trim().email().optional(),
 );
 
+const optionalUrl = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z
+    .string()
+    .trim()
+    .url()
+    .refine((value) => ['http:', 'https:'].includes(new URL(value).protocol), {
+      message: 'APP_URL must use http or https',
+    })
+    .optional(),
+);
+
 /**
  * Environment is validated once at startup so a misconfigured deploy fails
  * immediately with a readable message rather than at the first request.
@@ -32,6 +44,10 @@ const envSchema = z
     CORS_ORIGIN: z.string().default(''),
     /** How long a session stays valid after signing in. */
     SESSION_TTL_DAYS: z.coerce.number().int().positive().max(365).default(14),
+    /** Public web origin used to build links in account-invitation emails. */
+    APP_URL: optionalUrl,
+    /** How long an unused account-invitation link remains valid. */
+    ACCOUNT_INVITATION_TTL_HOURS: z.coerce.number().int().positive().max(168).default(48),
     /**
      * Marks the session cookie Secure.
      *
@@ -70,6 +86,13 @@ const envSchema = z
         message: 'RESEND_FROM_EMAIL is required in production',
       });
     }
+    if (!value.APP_URL) {
+      context.addIssue({
+        code: 'custom',
+        path: ['APP_URL'],
+        message: 'APP_URL is required in production',
+      });
+    }
   });
 
 const parsed = envSchema.safeParse(process.env);
@@ -83,6 +106,7 @@ if (!parsed.success) {
 
 export const env = {
   ...parsed.data,
+  appUrl: (parsed.data.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, ''),
   corsOrigins: parsed.data.CORS_ORIGIN.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),

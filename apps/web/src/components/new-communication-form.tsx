@@ -42,12 +42,15 @@ const emptyValues: FormValues = {
 
 const DUPLICATE_COMPANY = 'Η εταιρεία υπάρχει ήδη. Επιλέξτε την από τις υπάρχουσες εταιρείες.';
 
-export function NewCommunicationForm() {
+export function NewCommunicationForm({ fixedUser }: { fixedUser?: CommunicationUser }) {
   const router = useRouter();
-  const [values, setValues] = useState<FormValues>(emptyValues);
+  const [values, setValues] = useState<FormValues>(() => ({
+    ...emptyValues,
+    userId: fixedUser?.id ?? '',
+  }));
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [users, setUsers] = useState<CommunicationUser[]>([]);
+  const [users, setUsers] = useState<CommunicationUser[]>(() => (fixedUser ? [fixedUser] : []));
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
@@ -61,7 +64,9 @@ export function NewCommunicationForm() {
   useEffect(() => {
     void Promise.all([
       apiFetch<{ companies: Company[] }>('/companies'),
-      apiFetch<{ users: CommunicationUser[] }>('/users'),
+      fixedUser
+        ? Promise.resolve({ users: [fixedUser] })
+        : apiFetch<{ users: CommunicationUser[] }>('/users'),
     ])
       .then(([companyData, userData]) => {
         setCompanies(companyData.companies);
@@ -69,7 +74,7 @@ export function NewCommunicationForm() {
       })
       .catch(() => setError('Δεν ήταν δυνατή η φόρτωση των στοιχείων της φόρμας.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [fixedUser]);
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -231,6 +236,7 @@ export function NewCommunicationForm() {
       <CommunicationDetailsFields
         values={values}
         users={users}
+        fixedUser={fixedUser}
         disabled={loading}
         onChange={update}
       />
