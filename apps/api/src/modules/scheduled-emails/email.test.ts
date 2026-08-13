@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../lib/resend.js', () => ({
+  noReplyEmailSender: () => 'Onix CRM <noreply@sender.example.gr>',
   sendEmail: vi.fn(),
 }));
 
@@ -29,7 +30,8 @@ describe('scheduled email rendering', () => {
 
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: 'manager@example.gr',
+        from: 'Onix CRM <noreply@sender.example.gr>',
+        replyTo: 'manager@example.gr',
         to: 'company@example.gr',
         subject: 'Θέμα επικοινωνίας',
         text: 'Καλημέρα <script>alert("x")</script>\nΔεύτερη γραμμή',

@@ -342,9 +342,9 @@ or cast doubt on a password that already changed: the response carries
 Email configuration belongs to the API only. Account-related transactional
 messages send from `onboarding@resend.dev` in development and from
 `RESEND_FROM_EMAIL` at the verified domain in production. Scheduled company
-emails instead send from the active communication owner's account email, whose
-domain must also be verified in Resend. No Resend key or sender address may
-enter the web package or a `NEXT_PUBLIC_*` value.
+emails use `noreply` at that verified domain and set the active communication
+owner's email as `Reply-To`. No Resend key or sender address may enter the web
+package or a `NEXT_PUBLIC_*` value.
 
 ### Account invitations
 

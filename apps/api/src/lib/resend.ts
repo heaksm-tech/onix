@@ -6,6 +6,7 @@ const EMAIL_TIMEOUT_MS = 10_000;
 
 type Email = {
   from: string;
+  replyTo?: string;
   to: string;
   subject: string;
   text: string;
@@ -25,6 +26,15 @@ export function emailSender(displayName: string): string {
 /** Sender selected once for internal and account-related transactional email. */
 export function transactionalEmailSender(): string {
   return emailSender('Onix CRM');
+}
+
+/** No-reply identity at the exact verified domain used for company email. */
+export function noReplyEmailSender(): string {
+  if (!env.isProduction) return emailSender('Onix CRM');
+
+  const configuredAddress = env.resendFromEmail ?? 'onboarding@resend.dev';
+  const domain = configuredAddress.slice(configuredAddress.lastIndexOf('@') + 1);
+  return `Onix CRM <noreply@${domain}>`;
 }
 
 /**
@@ -52,6 +62,7 @@ export async function sendEmail(email: Email): Promise<boolean> {
       signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
       body: JSON.stringify({
         from: email.from,
+        ...(email.replyTo ? { reply_to: email.replyTo } : {}),
         to: [email.to],
         subject: email.subject,
         text: email.text,
