@@ -1,4 +1,4 @@
-import { sendEmail } from '../../lib/resend.js';
+import { noReplyEmailSender, sendEmail } from '../../lib/resend.js';
 
 export type ScheduledEmail = {
   id: string;
@@ -22,7 +22,10 @@ export async function sendScheduledEmail(email: ScheduledEmail): Promise<boolean
   const safeBody = escapeHtml(email.body);
 
   return sendEmail({
-    from: email.senderEmail,
+    // Resend only accepts From addresses at the verified sending domain. The
+    // message comes from noreply there, while replies go to the assigned user.
+    from: noReplyEmailSender(),
+    replyTo: email.senderEmail,
     to: email.recipientEmail,
     subject: email.subject,
     text: email.body,
