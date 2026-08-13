@@ -334,11 +334,8 @@ describe('role-scoped communications', () => {
     expect(clientQuery.mock.calls[1]?.[1]?.[1]).toBe(admin.id);
   });
 
-  it.each([
-    ['creating', 'POST', '/communications'],
-    ['updating', 'PUT', `/communications/${communicationId}`],
-  ])('rejects a past next-action time when %s a communication', async (_label, method, path) => {
-    const response = await request(manager, method, path, {
+  it('rejects a past next-action time when creating a communication', async () => {
+    const response = await request(manager, 'POST', '/communications', {
       companyId: '1',
       userId: manager.id,
       nextActionAt: new Date(Date.now() - 60_000).toISOString(),
@@ -358,6 +355,57 @@ describe('role-scoped communications', () => {
     });
     expect(queryOneMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unchanged past next-action time when updating a communication', async () => {
+    const nextActionAt = new Date(Date.now() - 120_000).toISOString();
+    queryOneMock.mockResolvedValue({ email: null });
+    const clientQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ next_action_at: new Date(nextActionAt) }] })
+      .mockResolvedValueOnce({ rows: [] });
+    transactionMock.mockImplementation((run) => run({ query: clientQuery } as never));
+
+    const response = await request(manager, 'PUT', `/communications/${communicationId}`, {
+      companyId: '1',
+      userId: manager.id,
+      notes: 'Ενημερώθηκαν οι σημειώσεις',
+      nextActionAt,
+    });
+
+    expect(response.status).toBe(204);
+    expect(clientQuery).toHaveBeenCalledTimes(2);
+    expect(clientQuery.mock.calls[1]?.[0]).toContain('UPDATE communications');
+  });
+
+  it('rejects a past next-action time when it was changed during an update', async () => {
+    const previousNextActionAt = new Date(Date.now() - 120_000);
+    const nextActionAt = new Date(Date.now() - 60_000).toISOString();
+    queryOneMock.mockResolvedValue({ email: null });
+    const clientQuery = vi.fn().mockResolvedValueOnce({
+      rows: [{ next_action_at: previousNextActionAt }],
+    });
+    transactionMock.mockImplementation((run) => run({ query: clientQuery } as never));
+
+    const response = await request(manager, 'PUT', `/communications/${communicationId}`, {
+      companyId: '1',
+      userId: manager.id,
+      nextActionAt,
+    });
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: 'VALIDATION_ERROR',
+        details: [
+          {
+            path: ['nextActionAt'],
+            message: 'Η υπενθύμιση πρέπει να είναι στο μέλλον.',
+          },
+        ],
+      },
+    });
+    expect(clientQuery).toHaveBeenCalledTimes(1);
   });
 
   it('schedules an email reminder when a communication has a next-action timestamp', async () => {

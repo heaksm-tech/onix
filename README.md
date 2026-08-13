@@ -325,7 +325,7 @@ key and put it in the environment used by the API and automation worker:
 RESEND_API_KEY=re_...
 ```
 
-`NODE_ENV` selects the delivery mode:
+`NODE_ENV` selects the sender for account-related transactional messages:
 
 | Environment | Sender                             | Recipient           |
 | ----------- | ---------------------------------- | ------------------- |
@@ -351,7 +351,10 @@ erasing the historical row. Everyone who can open the communication can review
 its pending, sent, failed and cancelled emails there. Once the active email is
 sent, the composer becomes available for a new message while the sent message
 stays in that history. The same worker claims due emails, sends them with a
-stable idempotency key and applies the same five-attempt retry policy.
+stable idempotency key and applies the same five-attempt retry policy. A company
+email is sent from the email address of the active user assigned to its
+communication. Every domain used by those accounts must therefore be verified
+in Resend; `RESEND_FROM_EMAIL` remains the sender for transactional messages.
 
 For production, add and verify your domain (or sending subdomain) in Resend,
 then set an address at that exact domain:

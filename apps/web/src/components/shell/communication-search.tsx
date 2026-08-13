@@ -39,7 +39,7 @@ export function CommunicationSearch() {
         type="button"
         aria-label="Αναζήτηση επικοινωνιών"
         onClick={() => setOpen(true)}
-        className="grid size-8 place-items-center rounded-lg border border-line bg-surface text-ink-faint shadow-card transition-colors duration-150 outline-none hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent/60 sm:flex sm:w-56 sm:justify-start sm:gap-2 sm:px-2.5"
+        className="grid size-8 min-w-8 place-items-center rounded-lg border border-line bg-surface text-ink-faint shadow-card transition-colors duration-150 outline-none hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent/60 sm:flex sm:w-56 sm:justify-start sm:gap-2 sm:px-2.5"
       >
         <IconSearch className="size-3.5" />
         <span className="hidden sm:inline">Αναζήτηση</span>

@@ -13,6 +13,7 @@ type ClaimedEmail = {
 
 type EmailDelivery = {
   id: string;
+  sender_email: string;
   recipient_email: string;
   subject: string;
   body: string;
@@ -52,14 +53,17 @@ async function claimDueEmails(): Promise<ClaimedEmail[]> {
 
 async function deliveryDetails(emailId: string): Promise<EmailDelivery | undefined> {
   return queryOne<EmailDelivery>(
-    `SELECT email.id, email.recipient_email, email.subject, email.body
+    `SELECT email.id, account.email AS sender_email,
+            email.recipient_email, email.subject, email.body
        FROM scheduled_emails AS email
        JOIN communications AS communication ON communication.id = email.communication_id
        JOIN companies AS company ON company.id = communication.company_id
+       JOIN users AS account ON account.id = communication.user_id
       WHERE email.id = $1
         AND email.status = 'processing'
         AND communication.deleted_at IS NULL
-        AND company.deleted_at IS NULL`,
+        AND company.deleted_at IS NULL
+        AND account.active`,
     [emailId],
   );
 }
@@ -68,7 +72,7 @@ async function markCancelled(emailId: string): Promise<void> {
   await query(
     `UPDATE scheduled_emails
         SET status = 'cancelled', cancelled_at = now(), processing_started_at = NULL,
-            last_error = 'Η επικοινωνία ή η εταιρεία δεν είναι πλέον ενεργή.'
+            last_error = 'Η επικοινωνία, η εταιρεία ή ο λογαριασμός αποστολής δεν είναι πλέον ενεργός.'
       WHERE id = $1 AND status = 'processing'`,
     [emailId],
   );
@@ -110,6 +114,7 @@ export async function runScheduledEmailBatch(): Promise<number> {
 
     const sent = await sendScheduledEmail({
       id: details.id,
+      senderEmail: details.sender_email,
       recipientEmail: details.recipient_email,
       subject: details.subject,
       body: details.body,

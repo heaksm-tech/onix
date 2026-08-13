@@ -339,11 +339,12 @@ after the database transaction commits. A Resend failure therefore cannot undo
 or cast doubt on a password that already changed: the response carries
 `notificationSent`, and the form reports the partial outcome explicitly.
 
-Email configuration belongs to the API only. In development it sends from
-`onboarding@resend.dev`; in production it sends from `RESEND_FROM_EMAIL` at the
-verified domain. Both environments send to the account's own email, while
-`NODE_ENV` chooses the sender. No Resend key or
-sender address may enter the web package or a `NEXT_PUBLIC_*` value.
+Email configuration belongs to the API only. Account-related transactional
+messages send from `onboarding@resend.dev` in development and from
+`RESEND_FROM_EMAIL` at the verified domain in production. Scheduled company
+emails instead send from the active communication owner's account email, whose
+domain must also be verified in Resend. No Resend key or sender address may
+enter the web package or a `NEXT_PUBLIC_*` value.
 
 ### Account invitations
 

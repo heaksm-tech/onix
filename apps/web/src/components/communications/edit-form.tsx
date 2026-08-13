@@ -303,6 +303,9 @@ export function EditCommunicationForm({
         values={values}
         users={userOptions}
         fixedUser={fixedUser}
+        initialNextActionAt={
+          communication.nextActionAt ? toDateTimeLocal(communication.nextActionAt) : ''
+        }
         disabled={loading}
         onChange={update}
       />
