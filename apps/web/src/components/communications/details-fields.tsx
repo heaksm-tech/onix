@@ -58,6 +58,7 @@ export function CommunicationDetailsFields({
   values,
   users,
   fixedUser,
+  initialNextActionAt = '',
   disabled = false,
   onChange,
 }: {
@@ -65,11 +66,12 @@ export function CommunicationDetailsFields({
   users: CommunicationUser[];
   /** Restricted roles are always the author, so there is nothing to choose. */
   fixedUser?: CommunicationUser;
+  /** An unchanged stored reminder may already have passed while the record was open. */
+  initialNextActionAt?: string;
   disabled?: boolean;
   onChange: (key: keyof CommunicationDetailsValues, value: string) => void;
 }) {
   const [minimumNextActionAt, setMinimumNextActionAt] = useState<string>();
-  const [pastNextActionAtAttempted, setPastNextActionAtAttempted] = useState(false);
 
   useEffect(() => {
     // The control stores whole minutes, so the next minute is the earliest
@@ -82,13 +84,16 @@ export function CommunicationDetailsFields({
     return () => window.clearInterval(timer);
   }, []);
 
-  const storedNextActionAtIsPast = Boolean(
-    values.nextActionAt && minimumNextActionAt && values.nextActionAt < minimumNextActionAt,
+  const nextActionAtChanged = values.nextActionAt !== initialNextActionAt;
+  const changedNextActionAtIsPast = Boolean(
+    nextActionAtChanged &&
+    values.nextActionAt &&
+    minimumNextActionAt &&
+    values.nextActionAt < minimumNextActionAt,
   );
-  const nextActionAtError =
-    pastNextActionAtAttempted || storedNextActionAtIsPast
-      ? 'Η υπενθύμιση πρέπει να είναι στο μέλλον.'
-      : undefined;
+  const nextActionAtError = changedNextActionAtIsPast
+    ? 'Η υπενθύμιση πρέπει να είναι στο μέλλον.'
+    : undefined;
 
   return (
     <Card className="p-5">
@@ -167,19 +172,12 @@ export function CommunicationDetailsFields({
         <Field label="Υπενθύμιση για" error={nextActionAtError}>
           <input
             type="datetime-local"
-            min={minimumNextActionAt}
+            // The browser's native constraint also needs the same exception:
+            // an untouched stored value must not make an otherwise valid edit unsaveable.
+            min={nextActionAtChanged || !initialNextActionAt ? minimumNextActionAt : undefined}
             aria-invalid={Boolean(nextActionAtError)}
             value={values.nextActionAt}
-            onChange={(event) => {
-              const nextValue = event.target.value;
-              if (nextValue && Date.parse(fromDateTimeLocal(nextValue)) <= Date.now()) {
-                setPastNextActionAtAttempted(true);
-                return;
-              }
-
-              setPastNextActionAtAttempted(false);
-              onChange('nextActionAt', nextValue);
-            }}
+            onChange={(event) => onChange('nextActionAt', event.target.value)}
             className={controlClass}
           />
         </Field>

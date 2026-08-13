@@ -100,10 +100,9 @@ function CommunicationRow({ item }: { item: CommunicationListItem }) {
         <p className="mt-0.5 truncate text-xs text-ink-secondary">
           {[item.contactName ?? 'Χωρίς επαφή', item.userName].join(' · ')}
         </p>
-        {item.nextActionAt ? (
+        {item.nextActionAt && !item.overdue ? (
           <p className="mt-1 text-xs tabular-nums text-ink-faint">
             {item.nextAction ?? 'Επόμενη ενέργεια'} · {formatDateTime(item.nextActionAt)}
-            {item.overdue ? <span className="text-negative"> · Εκπρόθεσμη</span> : null}
           </p>
         ) : null}
       </div>

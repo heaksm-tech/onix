@@ -1,7 +1,8 @@
-import { emailSender, sendEmail } from '../../lib/resend.js';
+import { sendEmail } from '../../lib/resend.js';
 
 export type ScheduledEmail = {
   id: string;
+  senderEmail: string;
   recipientEmail: string;
   subject: string;
   body: string;
@@ -21,15 +22,15 @@ export async function sendScheduledEmail(email: ScheduledEmail): Promise<boolean
   const safeBody = escapeHtml(email.body);
 
   return sendEmail({
-    from: emailSender('ΜΕΛΑΣ ΕΝΕΡΓΕΙΑΚΗ Α.Ε.'),
+    from: email.senderEmail,
     to: email.recipientEmail,
     subject: email.subject,
     text: email.body,
     html: `<!doctype html>
 <html lang="el">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
-<body style="margin:0;padding:32px;background:#ffffff;color:#1a1a1e;">
-  <div style="max-width:680px;margin:0 auto;white-space:pre-wrap;font-family:Arial,sans-serif;font-size:15px;line-height:1.65;">${safeBody}</div>
+<body style="margin:0;padding:32px;background:#ffffff;color:#1a1a1e;text-align:left;">
+  <div dir="auto" style="margin:0;white-space:pre-wrap;text-align:left;font-family:Arial,sans-serif;font-size:15px;line-height:1.65;">${safeBody}</div>
 </body>
 </html>`,
     idempotencyKey: `scheduled-email/${email.id}`,

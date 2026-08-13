@@ -229,21 +229,26 @@ const communicationFields = {
   interestLevel: z.number().int().min(1).max(5).optional(),
   notes: optionalText(10_000),
   nextAction: optionalText(255),
-  nextActionAt: z
-    .string()
-    .datetime({ offset: true })
-    .refine((value) => Date.parse(value) > Date.now(), {
-      message: 'Η υπενθύμιση πρέπει να είναι στο μέλλον.',
-    })
-    .optional(),
   scheduledEmail: scheduledEmailInput.optional(),
 };
+
+const nextActionAtInput = z.string().datetime({ offset: true });
+const futureNextActionAtInput = nextActionAtInput.refine(
+  (value) => Date.parse(value) > Date.now(),
+  {
+    message: 'Η υπενθύμιση πρέπει να είναι στο μέλλον.',
+  },
+);
+const changedNextActionAtInput = z.object({
+  nextActionAt: futureNextActionAtInput.optional(),
+});
 
 const createCommunicationInput = z
   .object({
     companyId: companyIdInput.optional(),
     company: companyInput.optional(),
     ...communicationFields,
+    nextActionAt: futureNextActionAtInput.optional(),
   })
   .superRefine((value, context) => {
     if (Boolean(value.companyId) === Boolean(value.company)) {
@@ -262,6 +267,9 @@ const createCommunicationInput = z
 const updateCommunicationInput = z.object({
   companyId: companyIdInput,
   ...communicationFields,
+  // A past value is provisionally accepted so the route can compare it with
+  // the stored timestamp. It is valid only when the edit leaves it unchanged.
+  nextActionAt: nextActionAtInput.optional(),
 });
 
 const idParams = z.object({ id: z.string().uuid('Μη έγκυρο αναγνωριστικό επικοινωνίας.') });
@@ -771,6 +779,12 @@ communicationsRouter.put(
       );
       const previous = existing.rows[0];
       if (!previous) throw HttpError.notFound('Η επικοινωνία δεν βρέθηκε.');
+
+      const previousNextActionAt = previous.next_action_at?.getTime() ?? null;
+      const nextNextActionAt = input.nextActionAt ? Date.parse(input.nextActionAt) : null;
+      if (previousNextActionAt !== nextNextActionAt) {
+        changedNextActionAtInput.parse({ nextActionAt: input.nextActionAt });
+      }
 
       await client.query(
         `UPDATE communications

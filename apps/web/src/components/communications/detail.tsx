@@ -121,14 +121,9 @@ export async function CommunicationDetailView({ id }: { id: string }) {
                 <Detail label="Ενέργεια">{communication.nextAction ?? '—'}</Detail>
                 <Detail label="Υπενθύμιση">
                   {communication.nextActionAt ? (
-                    <>
-                      <span className="tabular-nums">
-                        {formatDateTime(communication.nextActionAt)}
-                      </span>
-                      {communication.overdue ? (
-                        <span className="text-negative"> · Εκπρόθεσμη</span>
-                      ) : null}
-                    </>
+                    <span className="tabular-nums">
+                      {formatDateTime(communication.nextActionAt)}
+                    </span>
                   ) : (
                     '—'
                   )}

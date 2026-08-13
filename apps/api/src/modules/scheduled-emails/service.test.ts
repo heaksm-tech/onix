@@ -25,6 +25,7 @@ describe('scheduled email worker batch', () => {
       .mockResolvedValueOnce([]);
     queryOneMock.mockResolvedValue({
       id: 'email-id',
+      sender_email: 'manager@example.gr',
       recipient_email: 'company@example.gr',
       subject: 'Η προσφορά μας',
       body: 'Καλημέρα σας',
@@ -35,11 +36,14 @@ describe('scheduled email worker batch', () => {
 
     expect(sendEmailMock).toHaveBeenCalledWith({
       id: 'email-id',
+      senderEmail: 'manager@example.gr',
       recipientEmail: 'company@example.gr',
       subject: 'Η προσφορά μας',
       body: 'Καλημέρα σας',
     });
     expect(queryMock.mock.calls[2]?.[0]).toContain("status = 'sent'");
+    expect(queryOneMock.mock.calls[0]?.[0]).toContain('account.email AS sender_email');
+    expect(queryOneMock.mock.calls[0]?.[0]).toContain('AND account.active');
   });
 
   it('cancels a claimed email when its communication is no longer active', async () => {
@@ -62,6 +66,7 @@ describe('scheduled email worker batch', () => {
       .mockResolvedValueOnce([]);
     queryOneMock.mockResolvedValue({
       id: 'email-id',
+      sender_email: 'manager@example.gr',
       recipient_email: 'company@example.gr',
       subject: 'Η προσφορά μας',
       body: 'Καλημέρα σας',

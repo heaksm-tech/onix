@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../lib/resend.js', () => ({
-  emailSender: (name: string) => `${name} <sender@example.gr>`,
   sendEmail: vi.fn(),
 }));
 
@@ -21,6 +20,7 @@ describe('scheduled email rendering', () => {
     await expect(
       sendScheduledEmail({
         id: 'email-id',
+        senderEmail: 'manager@example.gr',
         recipientEmail: 'company@example.gr',
         subject: 'Θέμα επικοινωνίας',
         body: 'Καλημέρα <script>alert("x")</script>\nΔεύτερη γραμμή',
@@ -29,7 +29,7 @@ describe('scheduled email rendering', () => {
 
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: 'ΜΕΛΑΣ ΕΝΕΡΓΕΙΑΚΗ Α.Ε. <sender@example.gr>',
+        from: 'manager@example.gr',
         to: 'company@example.gr',
         subject: 'Θέμα επικοινωνίας',
         text: 'Καλημέρα <script>alert("x")</script>\nΔεύτερη γραμμή',
@@ -39,5 +39,9 @@ describe('scheduled email rendering', () => {
     const payload = sendEmailMock.mock.calls[0]?.[0];
     expect(payload?.html).toContain('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;');
     expect(payload?.html).not.toContain('<script>');
+    expect(payload?.html).toContain('dir="auto"');
+    expect(payload?.html).toContain('text-align:left');
+    expect(payload?.html).not.toContain('margin:0 auto');
+    expect(payload?.html).not.toContain('max-width:680px');
   });
 });
