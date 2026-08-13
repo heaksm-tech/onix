@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
+
 import { Card } from '@/components/card';
 import { Field, controlClass } from '@/components/field';
 import { SearchSelect } from '@/components/search-select';
-import { OUTCOMES, OUTCOME_LABELS, fromDateTimeLocal } from '@/lib/communications';
+import { OUTCOMES, OUTCOME_LABELS, fromDateTimeLocal, toDateTimeLocal } from '@/lib/communications';
 
 /**
  * The fields of a communication itself — everything except which company it
@@ -66,6 +68,28 @@ export function CommunicationDetailsFields({
   disabled?: boolean;
   onChange: (key: keyof CommunicationDetailsValues, value: string) => void;
 }) {
+  const [minimumNextActionAt, setMinimumNextActionAt] = useState<string>();
+  const [pastNextActionAtAttempted, setPastNextActionAtAttempted] = useState(false);
+
+  useEffect(() => {
+    // The control stores whole minutes, so the next minute is the earliest
+    // value that is unambiguously in the future when it is submitted.
+    const updateMinimum = () =>
+      setMinimumNextActionAt(toDateTimeLocal(new Date(Date.now() + 60_000).toISOString()));
+
+    updateMinimum();
+    const timer = window.setInterval(updateMinimum, 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const storedNextActionAtIsPast = Boolean(
+    values.nextActionAt && minimumNextActionAt && values.nextActionAt < minimumNextActionAt,
+  );
+  const nextActionAtError =
+    pastNextActionAtAttempted || storedNextActionAtIsPast
+      ? 'Η υπενθύμιση πρέπει να είναι στο μέλλον.'
+      : undefined;
+
   return (
     <Card className="p-5">
       <div className="mb-5">
@@ -140,11 +164,22 @@ export function CommunicationDetailsFields({
             ))}
           </select>
         </Field>
-        <Field label="Υπενθύμιση για">
+        <Field label="Υπενθύμιση για" error={nextActionAtError}>
           <input
             type="datetime-local"
+            min={minimumNextActionAt}
+            aria-invalid={Boolean(nextActionAtError)}
             value={values.nextActionAt}
-            onChange={(event) => onChange('nextActionAt', event.target.value)}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              if (nextValue && Date.parse(fromDateTimeLocal(nextValue)) <= Date.now()) {
+                setPastNextActionAtAttempted(true);
+                return;
+              }
+
+              setPastNextActionAtAttempted(false);
+              onChange('nextActionAt', nextValue);
+            }}
             className={controlClass}
           />
         </Field>

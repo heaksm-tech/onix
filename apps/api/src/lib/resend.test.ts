@@ -5,11 +5,11 @@ vi.mock('../config/logger.js', () => ({
   logger: { error: vi.fn(), warn: vi.fn() },
 }));
 
-import { sendEmail } from './resend.js';
+import { emailSender, sendEmail, transactionalEmailSender } from './resend.js';
 
 const email = {
   from: 'Onix CRM <onboarding@resend.dev>',
-  to: 'delivered+password-change@resend.dev',
+  to: 'user@example.gr',
   subject: 'Θέμα',
   text: 'Κείμενο',
   html: '<p>Κείμενο</p>',
@@ -21,6 +21,13 @@ afterEach(() => {
 });
 
 describe('Resend email boundary', () => {
+  it('supports a company-facing display name without changing the sending address', () => {
+    expect(emailSender('ΜΕΛΑΣ ΕΝΕΡΓΕΙΑΚΗ Α.Ε.')).toBe(
+      'ΜΕΛΑΣ ΕΝΕΡΓΕΙΑΚΗ Α.Ε. <onboarding@resend.dev>',
+    );
+    expect(transactionalEmailSender()).toBe('Onix CRM <onboarding@resend.dev>');
+  });
+
   it('sends the transactional payload with authentication and idempotency', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);

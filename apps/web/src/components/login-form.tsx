@@ -16,7 +16,6 @@ export function LoginForm({ next, error }: { next: string; error?: string }) {
           autoFocus
           required
           className={controlClass}
-          placeholder="onoma@melas.gr"
         />
       </Field>
 

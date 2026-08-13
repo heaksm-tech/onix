@@ -5,11 +5,20 @@ import type { ReactNode } from 'react';
 import { buttonClass } from '@/components/button';
 import { Card } from '@/components/card';
 import { DeleteCommunication } from '@/components/communications/delete-button';
+import { IconChevronDown } from '@/components/icons';
 import { LoadError } from '@/components/load-error';
 import { PageHeader } from '@/components/page-header';
 import { cn } from '@/lib/cn';
 import { loadCommunication } from '@/lib/communication-record';
-import { formatDateTime, interestLabel, outcomeLabel, outcomeTone } from '@/lib/communications';
+import {
+  formatDateTime,
+  interestLabel,
+  outcomeLabel,
+  outcomeTone,
+  SCHEDULED_EMAIL_STATUS_LABELS,
+  SCHEDULED_EMAIL_STATUS_TONES,
+  type ScheduledEmailHistoryItem,
+} from '@/lib/communications';
 
 const LIST_HREF: Route = '/companies/communications';
 
@@ -31,6 +40,7 @@ export async function CommunicationDetailView({ id }: { id: string }) {
   }
 
   const editHref = `/companies/communications/${communication.id}/edit` as const;
+  const emailHistory = communication.scheduledEmails ?? [];
 
   return (
     <>
@@ -130,8 +140,93 @@ export async function CommunicationDetailView({ id }: { id: string }) {
           </Card>
         </div>
       </div>
+
+      <Card className="mt-4 overflow-hidden">
+        <div className="p-5">
+          <h2 className="text-sm font-semibold">Ιστορικό email</h2>
+          <p className="mt-1 text-sm text-ink-secondary">
+            Προγραμματισμένα και ολοκληρωμένα email αυτής της επικοινωνίας.
+          </p>
+        </div>
+
+        {emailHistory.length > 0 ? (
+          <ol className="border-t border-line">
+            {emailHistory.map((email) => (
+              <li key={email.id} className="border-b border-line last:border-0">
+                <details
+                  className="group"
+                  open={email.status === 'pending' || email.status === 'processing'}
+                >
+                  <summary className="flex cursor-pointer list-none flex-col gap-3 px-5 py-4 outline-none hover:bg-ink/5 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="flex min-w-0 items-start gap-3">
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-full px-2 py-1 text-[11px] font-medium',
+                          SCHEDULED_EMAIL_STATUS_TONES[email.status],
+                        )}
+                      >
+                        {SCHEDULED_EMAIL_STATUS_LABELS[email.status]}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-ink">
+                          {email.subject}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-ink-faint">
+                          Προς {email.recipientEmail}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center justify-between gap-3 pl-0 sm:justify-end sm:pl-4">
+                      <span className="text-xs tabular-nums text-ink-secondary">
+                        {scheduledEmailTiming(email)}
+                      </span>
+                      <IconChevronDown className="size-4 text-ink-faint transition-transform duration-150 group-open:rotate-180" />
+                    </span>
+                  </summary>
+
+                  <div className="border-t border-line bg-canvas px-5 py-4">
+                    <dl className="grid gap-4 sm:grid-cols-3">
+                      <Detail label="Παραλήπτης">{email.recipientEmail}</Detail>
+                      <Detail label="Προγραμματισμένη αποστολή">
+                        <span className="tabular-nums">{formatDateTime(email.scheduledFor)}</span>
+                      </Detail>
+                      <Detail label="Κατάσταση">
+                        {SCHEDULED_EMAIL_STATUS_LABELS[email.status]}
+                      </Detail>
+                    </dl>
+                    <div className="mt-4 border-t border-line pt-4">
+                      <h3 className="text-xs text-ink-faint">Κείμενο email</h3>
+                      <p className="mt-2 text-sm whitespace-pre-wrap text-ink-secondary">
+                        {email.body}
+                      </p>
+                    </div>
+                  </div>
+                </details>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="border-t border-line px-5 py-6 text-sm text-ink-faint">
+            Δεν έχουν προγραμματιστεί email για αυτή την επικοινωνία.
+          </p>
+        )}
+      </Card>
     </>
   );
+}
+
+function scheduledEmailTiming(email: ScheduledEmailHistoryItem): string {
+  if (email.status === 'sent') {
+    return `Απεστάλη ${formatDateTime(email.sentAt ?? email.updatedAt)}`;
+  }
+  if (email.status === 'cancelled') {
+    return `Ακυρώθηκε ${formatDateTime(email.cancelledAt ?? email.updatedAt)}`;
+  }
+  if (email.status === 'failed') {
+    return `Αποτυχία ${formatDateTime(email.updatedAt)}`;
+  }
+  if (email.status === 'processing') return 'Αποστολή σε εξέλιξη';
+  return `Αποστολή ${formatDateTime(email.scheduledFor)}`;
 }
 
 function Detail({ label, children }: { label: string; children: ReactNode }) {

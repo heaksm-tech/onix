@@ -14,7 +14,7 @@ services:
     volumes:
       - onix-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,7 +30,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    restart: 'no'
+    restart: "no"
 
   api:
     build:
@@ -63,6 +63,23 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  reminder-worker:
+    build:
+      context: ./apps/api
+      target: runner
+    command: npm run reminders:start
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      APP_URL: ${APP_URL:?required}
+      RESEND_API_KEY: ${RESEND_API_KEY:?required}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:?required}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   web:
     build:
       context: ./apps/web
@@ -72,7 +89,7 @@ services:
       NODE_ENV: production
       API_URL: http://api:4000/api/v1
     ports:
-      - '${WEB_PORT:-3000}:3000'
+      - "${WEB_PORT:-3000}:3000"
     depends_on:
       - api
 

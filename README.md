@@ -1,6 +1,6 @@
 # Onix
 
-Internal B2B CRM for S. D. Melas Trading Business, managing company records, employee communications, follow-ups, and business development activities.
+Internal B2B CRM for Melas Energiaki, managing company records, employee communications, follow-ups, and business development activities.
 
 ## Stack
 
@@ -141,7 +141,7 @@ That is the whole setup.
 - `npm run setup` creates the env files, installs both apps, creates the
   `onix_dev` and `onix_test` databases, and applies all migrations.
 - `npm run db:seed` creates the two standard accounts below.
-- `npm run dev` starts both apps together with hot reload.
+- `npm run dev` starts both apps and the reminder worker together with hot reload.
 
 | Service | URL                                 |
 | ------- | ----------------------------------- |
@@ -317,9 +317,9 @@ after changing either seeded password.
 
 #### Resend in development and production
 
-Account invitations and password-change notifications share the same Resend
-boundary. Create a Resend API key and put it in the environment used by the
-API:
+Account invitations, password-change notifications, next-action reminders and
+scheduled company emails share the same Resend boundary. Create a Resend API
+key and put it in the environment used by the API and automation worker:
 
 ```env
 RESEND_API_KEY=re_...
@@ -329,14 +329,29 @@ RESEND_API_KEY=re_...
 
 | Environment | Sender                             | Recipient           |
 | ----------- | ---------------------------------- | ------------------- |
-| Development | `Onix CRM <onboarding@resend.dev>` | `RESEND_DEV_TO`     |
+| Development | `Onix CRM <onboarding@resend.dev>` | The account's email |
 | Production  | `Onix CRM <RESEND_FROM_EMAIL>`     | The account's email |
 
-Development defaults `RESEND_DEV_TO` to
-`delivered+password-change@resend.dev`, which safely simulates delivery and is
-visible in the Resend dashboard. To receive the message in your own inbox, set
-it to the email address attached to your Resend account; Resend's test domain
-cannot send to arbitrary recipients.
+Development uses Resend's test sender. That sender can deliver only to the
+email address attached to your Resend account. To send to other recipients,
+use a verified domain and its sender address.
+
+Every communication with `next_action_at` has a durable reminder row in
+PostgreSQL. A small worker checks due rows every 30 seconds and sends a Greek
+email to the active account assigned to the communication. If `next_action` is
+empty, the message uses a generic prompt to take the next action. Changing the
+timestamp cancels the old pending delivery and schedules the new one; clearing
+the timestamp or deleting the communication cancels it. Failed deliveries are
+retried up to five times with increasing delays.
+
+A communication may also hold one pending email to the selected company. The
+recipient, subject, exact plain-text body and send time are stored as a durable
+snapshot. Editing or removing the draft cancels its pending delivery without
+erasing the historical row. Everyone who can open the communication can review
+its pending, sent, failed and cancelled emails there. Once the active email is
+sent, the composer becomes available for a new message while the sent message
+stays in that history. The same worker claims due emails, sends them with a
+stable idempotency key and applies the same five-attempt retry policy.
 
 For production, add and verify your domain (or sending subdomain) in Resend,
 then set an address at that exact domain:
@@ -427,12 +442,13 @@ page — and it is live in about a second.
 Run these from the repository root; each delegates to the right app.
 
 ```bash
-npm run dev            # start both apps with hot reload
+npm run dev            # start API, reminder worker and web with hot reload
 npm run dev:api        # start only the API      (port 4000)
+npm run dev:reminders  # start only the next-action email worker
 npm run dev:web        # start only the web app  (port 3000)
 
 npm run build          # production build of both
-npm start              # run both from the production build
+npm start              # run API, reminder worker and web from the production build
 
 npm test               # API tests (vitest)
 npm run lint           # eslint, both apps
@@ -550,8 +566,9 @@ scripts work in both.
 docker compose up --build
 ```
 
-That starts PostgreSQL, applies pending migrations, and runs both apps with hot
-reload against the bind-mounted source. Same URLs as the table in section 2.
+That starts PostgreSQL, applies pending migrations, and runs both apps plus the
+next-action reminder worker with hot reload against the bind-mounted source.
+Same URLs as the table in section 2.
 
 The CRM is sign-in only and a fresh database has no accounts, so create one in
 the API container — the scripts from section 2a, unchanged:
@@ -572,8 +589,8 @@ database; `-v` on the end deletes it.
 ### Production stack
 
 `docker-compose.prod.yml` builds compiled images, runs the migrations as a
-one-shot service that must succeed before the API starts, and publishes only
-the web app — the API is reachable over the compose network alone. Here
+one-shot service that must succeed before the API and reminder worker start,
+and publishes only the web app — the API is reachable over the compose network alone. Here
 `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB` are required rather than
 defaulted, so the `.env` is not optional:
 

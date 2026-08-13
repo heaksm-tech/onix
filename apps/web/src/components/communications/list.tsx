@@ -24,12 +24,21 @@ import { apiFetchAsUser } from '@/lib/server-api';
  * can take on it; the row's own text answers "who, with whom, how did it go"
  * so the reader rarely has to open anything.
  */
-export async function CommunicationsList({ page, userId }: { page: number; userId?: string }) {
+export async function CommunicationsList({
+  page,
+  userId,
+  search,
+}: {
+  page: number;
+  userId?: string;
+  search?: string;
+}) {
   let result: CommunicationsPage;
 
   try {
     const query = new URLSearchParams({ page: String(page) });
     if (userId) query.set('userId', userId);
+    if (search) query.set('q', search);
     result = await apiFetchAsUser<CommunicationsPage>(`/communications?${query}`);
   } catch {
     return (
@@ -43,8 +52,12 @@ export async function CommunicationsList({ page, userId }: { page: number; userI
     return (
       <EmptyState
         icon={IconActivity}
-        title="Δεν υπάρχουν ακόμη επικοινωνίες"
-        description="Μόλις καταγραφεί η πρώτη επικοινωνία με εταιρεία, θα εμφανίζεται εδώ με το αποτέλεσμα και την επόμενη ενέργειά της."
+        title={search ? 'Δεν βρέθηκαν επικοινωνίες' : 'Δεν υπάρχουν ακόμη επικοινωνίες'}
+        description={
+          search
+            ? `Δεν υπάρχουν εγγραφές που να ταιριάζουν με «${search}». Δοκιμάστε διαφορετικό όρο αναζήτησης.`
+            : 'Μόλις καταγραφεί η πρώτη επικοινωνία με εταιρεία, θα εμφανίζεται εδώ με το αποτέλεσμα και την επόμενη ενέργειά της.'
+        }
       />
     );
   }
@@ -67,7 +80,7 @@ export async function CommunicationsList({ page, userId }: { page: number; userI
         )}
       </Card>
 
-      <Pager page={page} pages={pages} total={total} userId={userId} />
+      <Pager page={page} pages={pages} total={total} userId={userId} search={search} />
     </div>
   );
 }
@@ -137,11 +150,13 @@ function Pager({
   pages,
   total,
   userId,
+  search,
 }: {
   page: number;
   pages: number;
   total: number;
   userId?: string;
+  search?: string;
 }) {
   if (pages === 1) return null;
 
@@ -151,10 +166,10 @@ function Pager({
         Σελίδα {page} από {pages} · {total} επικοινωνίες
       </p>
       <div className="flex items-center gap-2">
-        <PagerLink page={page - 1} available={page > 1} userId={userId}>
+        <PagerLink page={page - 1} available={page > 1} userId={userId} search={search}>
           Προηγούμενη
         </PagerLink>
-        <PagerLink page={page + 1} available={page < pages} userId={userId}>
+        <PagerLink page={page + 1} available={page < pages} userId={userId} search={search}>
           Επόμενη
         </PagerLink>
       </div>
@@ -167,11 +182,13 @@ function PagerLink({
   available,
   children,
   userId,
+  search,
 }: {
   page: number;
   available: boolean;
   children: string;
   userId?: string;
+  search?: string;
 }) {
   // The unavailable end of the range keeps its place rather than disappearing,
   // so the pair of controls does not shift as you page through.
@@ -185,6 +202,7 @@ function PagerLink({
 
   const query = new URLSearchParams({ page: String(page) });
   if (userId) query.set('userId', userId);
+  if (search) query.set('q', search);
 
   return (
     <Link href={`/companies/communications?${query}`} className={buttonClass('secondary', 'sm')}>

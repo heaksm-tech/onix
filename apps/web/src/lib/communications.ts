@@ -56,6 +56,13 @@ export function communicationUserFilter(value: string | string[] | undefined): s
     : undefined;
 }
 
+/** A bounded search term read from the communication list URL. */
+export function communicationSearch(value: string | string[] | undefined): string | undefined {
+  const first = Array.isArray(value) ? value[0] : value;
+  const search = first?.trim().slice(0, 200);
+  return search || undefined;
+}
+
 /** «3/5» — or a dash where no level was recorded. */
 export function interestLabel(level: number | null): string {
   return level === null ? '—' : `${level}/5`;
@@ -86,6 +93,37 @@ export type CommunicationsPage = {
   pageSize: number;
 };
 
+export type ScheduledEmailStatus = 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled';
+
+export type ScheduledEmailHistoryItem = {
+  id: string;
+  recipientEmail: string;
+  subject: string;
+  body: string;
+  scheduledFor: string;
+  status: ScheduledEmailStatus;
+  sentAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const SCHEDULED_EMAIL_STATUS_LABELS: Record<ScheduledEmailStatus, string> = {
+  pending: 'Προγραμματισμένο',
+  processing: 'Αποστέλλεται',
+  sent: 'Απεστάλη',
+  failed: 'Αποτυχία αποστολής',
+  cancelled: 'Ακυρώθηκε',
+};
+
+export const SCHEDULED_EMAIL_STATUS_TONES: Record<ScheduledEmailStatus, string> = {
+  pending: 'bg-accent-soft text-accent',
+  processing: 'bg-accent-soft text-accent',
+  sent: 'bg-positive/10 text-positive',
+  failed: 'bg-negative/10 text-negative',
+  cancelled: 'bg-ink/5 text-ink-faint',
+};
+
 /** What `GET /communications/:id` returns — the list row plus everything else. */
 export type CommunicationDetail = CommunicationListItem & {
   companyEmail: string | null;
@@ -93,6 +131,13 @@ export type CommunicationDetail = CommunicationListItem & {
   contactRole: string | null;
   notes: string | null;
   updatedAt: string;
+  scheduledEmail: {
+    recipientEmail: string;
+    subject: string;
+    body: string;
+    scheduledFor: string;
+  } | null;
+  scheduledEmails: ScheduledEmailHistoryItem[];
 };
 
 /** What `GET /communications/summary` returns. */

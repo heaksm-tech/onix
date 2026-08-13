@@ -8,9 +8,10 @@ import {
   CommunicationAccountFilterFallback,
 } from '@/components/communications/account-filter';
 import { CommunicationsList, CommunicationsListFallback } from '@/components/communications/list';
+import { CommunicationsSearch } from '@/components/communications/search';
 import { PageHeader } from '@/components/page-header';
 import { getCurrentUser } from '@/lib/auth';
-import { communicationUserFilter } from '@/lib/communications';
+import { communicationSearch, communicationUserFilter } from '@/lib/communications';
 import { canViewAllCommunications } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Επικοινωνίες' };
@@ -30,6 +31,7 @@ export default async function CommunicationsPage({
   const user = await getCurrentUser();
   const sharedView = user ? canViewAllCommunications(user.role) : false;
   const userId = sharedView ? communicationUserFilter(query.userId) : undefined;
+  const search = communicationSearch(query.q);
 
   return (
     <>
@@ -51,9 +53,13 @@ export default async function CommunicationsPage({
           <CommunicationAccountFilter userId={userId} />
         </Suspense>
       ) : null}
-      {/* Keyed by page, so paging shows the fallback instead of the previous page's rows. */}
-      <Suspense key={`${page}:${userId ?? 'all'}`} fallback={<CommunicationsListFallback />}>
-        <CommunicationsList page={page} userId={userId} />
+      <CommunicationsSearch search={search} userId={userId} />
+      {/* Keyed by the result set, so changing a filter shows the fallback instead of stale rows. */}
+      <Suspense
+        key={`${page}:${userId ?? 'all'}:${search ?? ''}`}
+        fallback={<CommunicationsListFallback />}
+      >
+        <CommunicationsList page={page} userId={userId} search={search} />
       </Suspense>
     </>
   );

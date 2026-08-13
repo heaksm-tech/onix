@@ -6,6 +6,16 @@ import { HttpError } from '../../lib/http-error.js';
 import { requireRole } from '../../middleware/require-role.js';
 import { validate } from '../../middleware/validate.js';
 import type { AuthUser } from '../auth/types.js';
+import {
+  cancelNextActionReminder,
+  synchronizeNextActionReminder,
+} from '../next-action-reminders/schedule.js';
+import {
+  cancelScheduledEmail,
+  type ScheduledEmailDraft,
+  type StoredScheduledEmail,
+  synchronizeScheduledEmail,
+} from '../scheduled-emails/schedule.js';
 
 type User = { id: string; name: string; email: string };
 type Communication = {
@@ -70,6 +80,29 @@ type DetailRow = ListRow & {
   contact_role: string | null;
   notes: string | null;
   updated_at: string;
+  scheduled_emails: ScheduledEmailHistoryRow[];
+};
+
+type ScheduledEmailHistoryRow = {
+  id: string;
+  recipientEmail: string;
+  subject: string;
+  body: string;
+  scheduledFor: string;
+  status: 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled';
+  sentAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type PreviousCommunication = {
+  next_action_at: Date | null;
+  scheduled_email_id: string | null;
+  scheduled_email_recipient: string | null;
+  scheduled_email_subject: string | null;
+  scheduled_email_body: string | null;
+  scheduled_email_for: Date | null;
 };
 
 /**
@@ -150,11 +183,13 @@ const optionalText = (max: number) =>
     .optional()
     .transform((value) => value || undefined);
 
+const emailAddress = z.string().trim().max(255).email('Συμπληρώστε μια έγκυρη διεύθυνση email.');
+
 // Maximum lengths mirror the column widths in `companies`, so an over-long
 // value is a 422 naming the field rather than a 500 from Postgres.
 const companyInput = z.object({
   name: z.string().trim().min(1).max(255),
-  email: optionalText(255),
+  email: emailAddress.optional().transform((value) => value || undefined),
   // NOT NULL in `companies`: a company is reached by phone, so the record is
   // not useful without one.
   phone: z.string().trim().min(1).max(30),
@@ -166,6 +201,20 @@ const companyIdInput = z
   .string()
   .trim()
   .regex(/^[1-9]\d*$/, 'Μη έγκυρο αναγνωριστικό εταιρείας.');
+
+const scheduledEmailInput = z.object({
+  subject: z.string().trim().min(1, 'Συμπληρώστε το θέμα του email.').max(255),
+  body: z
+    .string()
+    .max(50_000)
+    .refine((value) => value.trim().length > 0, 'Συμπληρώστε το κείμενο του email.'),
+  scheduledFor: z
+    .string()
+    .datetime({ offset: true })
+    .refine((value) => Date.parse(value) > Date.now(), {
+      message: 'Η αποστολή του email πρέπει να είναι στο μέλλον.',
+    }),
+});
 
 /**
  * The fields of a communication itself, shared by create and update so the
@@ -180,7 +229,14 @@ const communicationFields = {
   interestLevel: z.number().int().min(1).max(5).optional(),
   notes: optionalText(10_000),
   nextAction: optionalText(255),
-  nextActionAt: z.string().datetime({ offset: true }).optional(),
+  nextActionAt: z
+    .string()
+    .datetime({ offset: true })
+    .refine((value) => Date.parse(value) > Date.now(), {
+      message: 'Η υπενθύμιση πρέπει να είναι στο μέλλον.',
+    })
+    .optional(),
+  scheduledEmail: scheduledEmailInput.optional(),
 };
 
 const createCommunicationInput = z
@@ -215,6 +271,7 @@ const summaryQuery = z.object({ userId: authorFilter });
 const listQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
   userId: authorFilter,
+  q: optionalText(200),
 });
 
 type CreateCommunicationInput = z.infer<typeof createCommunicationInput>;
@@ -222,6 +279,7 @@ type UpdateCommunicationInput = z.infer<typeof updateCommunicationInput>;
 type IdParams = z.infer<typeof idParams>;
 type SummaryQuery = z.infer<typeof summaryQuery>;
 type ListQuery = z.infer<typeof listQuery>;
+type ScheduledEmailInput = z.infer<typeof scheduledEmailInput>;
 
 /**
  * The columns behind a listed communication.
@@ -239,6 +297,27 @@ const LIST_COLUMNS = `c.id, c.company_id, co.name AS company_name, c.contact_nam
 const LIST_FROM = `FROM communications AS c
          JOIN companies AS co ON co.id = c.company_id
          LEFT JOIN users AS u ON u.id = c.user_id`;
+
+/**
+ * A communication is more than its company name. Search the text a reader can
+ * see on either the list or detail screen, plus the author's identity.
+ * `strpos` treats `%` and `_` literally, unlike an ILIKE pattern assembled
+ * from user input, while `concat_ws` safely skips nullable fields.
+ */
+function communicationSearchCondition(parameter: number): string {
+  const search = `$${parameter}`;
+  return `(
+            ${search}::text IS NULL
+            OR strpos(
+                 lower(concat_ws(' ',
+                   co.name, co.email, co.phone,
+                   c.contact_name, c.contact_role, c.notes, c.next_action,
+                   u.name, u.email
+                 )),
+                 lower(${search})
+               ) > 0
+          )`;
+}
 
 function toListItem(row: ListRow) {
   return {
@@ -258,6 +337,11 @@ function toListItem(row: ListRow) {
 }
 
 function toDetail(row: DetailRow) {
+  const scheduledEmails = Array.isArray(row.scheduled_emails) ? row.scheduled_emails : [];
+  const activeScheduledEmail = scheduledEmails.find(
+    (email) => email.status === 'pending' || email.status === 'processing',
+  );
+
   return {
     ...toListItem(row),
     companyEmail: row.company_email,
@@ -265,6 +349,55 @@ function toDetail(row: DetailRow) {
     contactRole: row.contact_role,
     notes: row.notes,
     updatedAt: row.updated_at,
+    scheduledEmail: activeScheduledEmail
+      ? {
+          recipientEmail: activeScheduledEmail.recipientEmail,
+          subject: activeScheduledEmail.subject,
+          body: activeScheduledEmail.body,
+          scheduledFor: activeScheduledEmail.scheduledFor,
+        }
+      : null,
+    scheduledEmails,
+  };
+}
+
+function scheduledEmailDraft(
+  email: ScheduledEmailInput | undefined,
+  companyEmail: string | null | undefined,
+): ScheduledEmailDraft | undefined {
+  if (!email) return undefined;
+
+  const recipient = emailAddress.safeParse(companyEmail);
+  if (!recipient.success) {
+    throw HttpError.unprocessable(
+      'Προσθέστε έγκυρο email στην εταιρεία πριν προγραμματίσετε την αποστολή.',
+    );
+  }
+
+  return {
+    recipientEmail: recipient.data,
+    subject: email.subject,
+    body: email.body,
+    scheduledFor: email.scheduledFor,
+  };
+}
+
+function storedScheduledEmail(previous: PreviousCommunication): StoredScheduledEmail | undefined {
+  if (
+    !previous.scheduled_email_id ||
+    !previous.scheduled_email_recipient ||
+    !previous.scheduled_email_subject ||
+    previous.scheduled_email_body === null ||
+    !previous.scheduled_email_for
+  ) {
+    return undefined;
+  }
+
+  return {
+    recipient_email: previous.scheduled_email_recipient,
+    subject: previous.scheduled_email_subject,
+    body: previous.scheduled_email_body,
+    scheduled_for: previous.scheduled_email_for,
   };
 }
 
@@ -440,6 +573,7 @@ communicationsRouter.post(
 
     const result = await transaction(async (client) => {
       let companyId = input.companyId;
+      let companyEmail = input.company?.email ?? null;
       let companyCreated = false;
 
       if (input.company) {
@@ -447,29 +581,32 @@ communicationsRouter.post(
         // clash would be a 500, so it is caught here as a 409 the form can
         // show next to the field — and caught by the same statement that
         // inserts, which leaves no window for a second request to slip in.
-        const company = await client.query<{ id: string }>(
+        const company = await client.query<{ id: string; email: string | null }>(
           `INSERT INTO companies (name, email, phone)
          VALUES ($1, $2, $3)
          ON CONFLICT (lower(name)) WHERE deleted_at IS NULL DO NOTHING
-         RETURNING id`,
+         RETURNING id, email`,
           [input.company.name, input.company.email ?? null, input.company.phone],
         );
         if (company.rowCount === 0) {
           throw HttpError.conflict(`Η εταιρεία «${input.company.name}» υπάρχει ήδη.`);
         }
         companyId = company.rows[0]?.id;
+        companyEmail = company.rows[0]?.email ?? null;
         companyCreated = true;
       } else {
         // Checked rather than left to the foreign key, so a stale option in the
         // caller's dropdown reads as "company not found" instead of a 500.
-        const existing = await client.query(
-          `SELECT 1 FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+        const existing = await client.query<{ email: string | null }>(
+          `SELECT email FROM companies WHERE id = $1 AND deleted_at IS NULL`,
           [companyId],
         );
         if (existing.rowCount === 0) throw HttpError.notFound('Η εταιρεία δεν βρέθηκε.');
+        companyEmail = existing.rows[0]?.email ?? null;
       }
 
       if (!companyId) throw new Error('Company id was not resolved');
+      const nextScheduledEmail = scheduledEmailDraft(input.scheduledEmail, companyEmail);
 
       const communication = await client.query<Communication>(
         `INSERT INTO communications (
@@ -490,7 +627,18 @@ communicationsRouter.post(
         ],
       );
 
-      return { communication: communication.rows[0], companyCreated };
+      const createdCommunication = communication.rows[0];
+      if (!createdCommunication) throw new Error('Communication insert returned no row');
+
+      await synchronizeNextActionReminder(
+        client,
+        createdCommunication.id,
+        null,
+        input.nextActionAt,
+      );
+      await synchronizeScheduledEmail(client, createdCommunication.id, null, nextScheduledEmail);
+
+      return { communication: createdCommunication, companyCreated };
     });
 
     res.status(201).json(result);
@@ -506,7 +654,7 @@ communicationsRouter.post(
 communicationsRouter.get('/communications', validate(listQuery, 'query'), async (req, res) => {
   const user = req.user;
   if (!user) throw HttpError.unauthorized('Απαιτείται σύνδεση.');
-  const { page, userId: requestedUserId } = req.query as unknown as ListQuery;
+  const { page, userId: requestedUserId, q: search } = req.query as unknown as ListQuery;
   const { canViewAll, userId } = communicationScope(user, requestedUserId);
 
   const [items, totals] = await Promise.all([
@@ -515,16 +663,18 @@ communicationsRouter.get('/communications', validate(listQuery, 'query'), async 
          ${LIST_FROM}
         WHERE c.deleted_at IS NULL
           AND ($3::boolean OR c.user_id = $4)
+          AND ${communicationSearchCondition(5)}
         ORDER BY c.created_at DESC, c.id DESC
         LIMIT $1 OFFSET $2`,
-      [PAGE_SIZE, (page - 1) * PAGE_SIZE, canViewAll, userId],
+      [PAGE_SIZE, (page - 1) * PAGE_SIZE, canViewAll, userId, search ?? null],
     ),
     queryOne<{ count: number }>(
       `SELECT count(*)::int AS count
-         FROM communications
-        WHERE deleted_at IS NULL
-          AND ($1::boolean OR user_id = $2)`,
-      [canViewAll, userId],
+         ${LIST_FROM}
+        WHERE c.deleted_at IS NULL
+          AND ($1::boolean OR c.user_id = $2)
+          AND ${communicationSearchCondition(3)}`,
+      [canViewAll, userId, search ?? null],
     ),
   ]);
 
@@ -545,7 +695,25 @@ communicationsRouter.get('/communications/:id', validate(idParams, 'params'), as
 
   const row = await queryOne<DetailRow>(
     `SELECT ${LIST_COLUMNS}, co.email AS company_email, co.phone AS company_phone,
-              c.contact_role, c.notes, c.updated_at
+              c.contact_role, c.notes, c.updated_at,
+              coalesce((
+                SELECT jsonb_agg(
+                         jsonb_build_object(
+                           'id', email.id,
+                           'recipientEmail', email.recipient_email,
+                           'subject', email.subject,
+                           'body', email.body,
+                           'scheduledFor', email.scheduled_for,
+                           'status', email.status,
+                           'sentAt', email.sent_at,
+                           'cancelledAt', email.cancelled_at,
+                           'createdAt', email.created_at,
+                           'updatedAt', email.updated_at
+                         ) ORDER BY email.created_at DESC
+                       )
+                  FROM scheduled_emails AS email
+                 WHERE email.communication_id = c.id
+              ), '[]'::jsonb) AS scheduled_emails
          ${LIST_FROM}
         WHERE c.id = $1
           AND c.deleted_at IS NULL
@@ -571,37 +739,67 @@ communicationsRouter.put(
 
     // Checked rather than left to the foreign key, so a stale option in the
     // caller's dropdown reads as "company not found" instead of a 500.
-    const company = await queryOne(`SELECT 1 FROM companies WHERE id = $1 AND deleted_at IS NULL`, [
-      input.companyId,
-    ]);
-    if (!company) throw HttpError.notFound('Η εταιρεία δεν βρέθηκε.');
-
-    const updated = await queryOne<{ id: string }>(
-      `UPDATE communications
-          SET company_id = $2, user_id = $3, contact_name = $4, contact_role = $5,
-              outcome = $6, interest_level = $7, notes = $8, next_action = $9,
-              next_action_at = $10
-        WHERE id = $1
-          AND deleted_at IS NULL
-          AND ($11::boolean OR user_id = $12)
-        RETURNING id`,
-      [
-        id,
-        input.companyId,
-        userId,
-        input.contactName ?? null,
-        input.contactRole ?? null,
-        input.outcome ?? null,
-        input.interestLevel ?? null,
-        input.notes ?? null,
-        input.nextAction ?? null,
-        input.nextActionAt ?? null,
-        canViewAllCommunications(user),
-        user.id,
-      ],
+    const company = await queryOne<{ email: string | null }>(
+      `SELECT email FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+      [input.companyId],
     );
+    if (!company) throw HttpError.notFound('Η εταιρεία δεν βρέθηκε.');
+    const nextScheduledEmail = scheduledEmailDraft(input.scheduledEmail, company.email);
 
-    if (!updated) throw HttpError.notFound('Η επικοινωνία δεν βρέθηκε.');
+    await transaction(async (client) => {
+      const existing = await client.query<PreviousCommunication>(
+        `SELECT communication.next_action_at,
+                scheduled_email.id AS scheduled_email_id,
+                scheduled_email.recipient_email AS scheduled_email_recipient,
+                scheduled_email.subject AS scheduled_email_subject,
+                scheduled_email.body AS scheduled_email_body,
+                scheduled_email.scheduled_for AS scheduled_email_for
+           FROM communications AS communication
+           LEFT JOIN LATERAL (
+             SELECT id, recipient_email, subject, body, scheduled_for
+               FROM scheduled_emails
+              WHERE communication_id = communication.id
+                AND status IN ('pending', 'processing')
+              ORDER BY created_at DESC
+              LIMIT 1
+           ) AS scheduled_email ON true
+          WHERE communication.id = $1
+            AND communication.deleted_at IS NULL
+            AND ($2::boolean OR communication.user_id = $3)
+          FOR UPDATE OF communication`,
+        [id, canViewAllCommunications(user), user.id],
+      );
+      const previous = existing.rows[0];
+      if (!previous) throw HttpError.notFound('Η επικοινωνία δεν βρέθηκε.');
+
+      await client.query(
+        `UPDATE communications
+            SET company_id = $2, user_id = $3, contact_name = $4, contact_role = $5,
+                outcome = $6, interest_level = $7, notes = $8, next_action = $9,
+                next_action_at = $10
+          WHERE id = $1`,
+        [
+          id,
+          input.companyId,
+          userId,
+          input.contactName ?? null,
+          input.contactRole ?? null,
+          input.outcome ?? null,
+          input.interestLevel ?? null,
+          input.notes ?? null,
+          input.nextAction ?? null,
+          input.nextActionAt ?? null,
+        ],
+      );
+
+      await synchronizeNextActionReminder(client, id, previous.next_action_at, input.nextActionAt);
+      await synchronizeScheduledEmail(
+        client,
+        id,
+        storedScheduledEmail(previous),
+        nextScheduledEmail,
+      );
+    });
 
     res.status(204).end();
   },
@@ -620,17 +818,21 @@ communicationsRouter.delete(
     if (!user) throw HttpError.unauthorized('Απαιτείται σύνδεση.');
     const { id } = req.params as IdParams;
 
-    const deleted = await queryOne<{ id: string }>(
-      `UPDATE communications
-          SET deleted_at = now()
-        WHERE id = $1
-          AND deleted_at IS NULL
-          AND ($2::boolean OR user_id = $3)
-        RETURNING id`,
-      [id, canViewAllCommunications(user), user.id],
-    );
+    await transaction(async (client) => {
+      const deleted = await client.query<{ id: string }>(
+        `UPDATE communications
+            SET deleted_at = now()
+          WHERE id = $1
+            AND deleted_at IS NULL
+            AND ($2::boolean OR user_id = $3)
+          RETURNING id`,
+        [id, canViewAllCommunications(user), user.id],
+      );
 
-    if (!deleted) throw HttpError.notFound('Η επικοινωνία δεν βρέθηκε.');
+      if (!deleted.rows[0]) throw HttpError.notFound('Η επικοινωνία δεν βρέθηκε.');
+      await cancelNextActionReminder(client, id);
+      await cancelScheduledEmail(client, id);
+    });
 
     res.status(204).end();
   },
