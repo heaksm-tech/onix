@@ -1,5 +1,5 @@
 /**
- * The shared vocabulary of a company — which today is its name.
+ * The shared vocabulary of a company used by communication forms.
  *
  * A name identifies the company, and the database holds a unique index on the
  * trimmed, case-folded form of it. Both forms that can take a name check it
@@ -7,7 +7,12 @@
  * rather than on save; the API is still the authority, and answers 409.
  */
 
-export type CompanyOption = { id: string; name: string };
+export type CompanyOption = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+};
 
 /** The same key the database is unique on. */
 export function companyNameKey(name: string): string {

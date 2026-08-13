@@ -68,6 +68,7 @@ describe('POST /auth/activate-account', () => {
       .mockResolvedValueOnce({ rows: [user] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
 
     queryOneMock.mockResolvedValueOnce(invitation);
@@ -78,12 +79,21 @@ describe('POST /auth/activate-account', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ user });
     expect(response.headers.get('set-cookie')).toContain('onix_session=');
-    expect(clientQuery).toHaveBeenCalledTimes(5);
+    expect(clientQuery).toHaveBeenCalledTimes(6);
     expect(clientQuery.mock.calls[2]).toEqual([
       'UPDATE account_invitations SET accepted_at = now() WHERE id = $1 AND accepted_at IS NULL',
       [invitation.invitation_id],
     ]);
     expect(clientQuery.mock.calls[4]?.[0]).toContain('INSERT INTO sessions');
+    expect(clientQuery.mock.calls[5]?.[0]).toContain('INSERT INTO notifications');
+    expect(clientQuery.mock.calls[5]?.[0]).toContain('WHERE role = $1');
+    expect(clientQuery.mock.calls[5]?.[0]).toContain('AND active');
+    expect(clientQuery.mock.calls[5]?.[1]).toEqual([
+      'admin',
+      'Νέος ενεργός λογαριασμός',
+      `Ο λογαριασμός ${user.email} ενεργοποιήθηκε και ο χρήστης μπορεί πλέον να συνδεθεί.`,
+      '/accounts',
+    ]);
   });
 
   it('answers an unknown, expired or already-used token with one safe error', async () => {

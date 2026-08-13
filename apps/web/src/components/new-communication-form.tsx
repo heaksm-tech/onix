@@ -10,6 +10,12 @@ import {
   type CommunicationDetailsValues,
   type CommunicationUser,
 } from '@/components/communications/details-fields';
+import {
+  EmailComposer,
+  EMPTY_SCHEDULED_EMAIL,
+  scheduledEmailPayload,
+  type ScheduledEmailValues,
+} from '@/components/communications/email-composer';
 import { ApiError, apiFetch } from '@/lib/api';
 import { companyNameKey, companyWithName } from '@/lib/companies';
 import { SearchSelect, type SearchSelectOption } from '@/components/search-select';
@@ -60,6 +66,9 @@ export function NewCommunicationForm({ fixedUser }: { fixedUser?: CommunicationU
    * added by someone else after this form loaded.
    */
   const [takenName, setTakenName] = useState<string>();
+  const [scheduledEmail, setScheduledEmail] = useState<ScheduledEmailValues>(EMPTY_SCHEDULED_EMAIL);
+  const [existingEmailDraft, setExistingEmailDraft] = useState<string>();
+  const [existingPhoneDraft, setExistingPhoneDraft] = useState<string>();
 
   useEffect(() => {
     void Promise.all([
@@ -91,6 +100,12 @@ export function NewCommunicationForm({ fixedUser }: { fixedUser?: CommunicationU
   const duplicateCompany =
     mode === 'new' &&
     (Boolean(companyWithName(companies, values.companyName)) || takenName === typedName);
+  const selectedCompany = companies.find((company) => company.id === values.companyId);
+  const existingCompanyEmail = existingEmailDraft ?? selectedCompany?.email ?? '';
+  const existingCompanyPhone = existingPhoneDraft ?? selectedCompany?.phone ?? '';
+  const recipientEmail = mode === 'new' ? values.companyEmail.trim() : existingCompanyEmail.trim();
+  const recipientCompanyName =
+    mode === 'new' ? values.companyName.trim() : (selectedCompany?.name ?? '');
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,6 +117,10 @@ export function NewCommunicationForm({ fixedUser }: { fixedUser?: CommunicationU
     }
     if (mode === 'existing' && !values.companyId) {
       setError('Επιλέξτε εταιρεία.');
+      return;
+    }
+    if (mode === 'existing' && !existingCompanyPhone.trim()) {
+      setError('Συμπληρώστε το τηλέφωνο της εταιρείας.');
       return;
     }
     if (mode === 'new' && !values.companyName.trim()) {
@@ -117,10 +136,26 @@ export function NewCommunicationForm({ fixedUser }: { fixedUser?: CommunicationU
 
     setSubmitting(true);
     try {
+      if (
+        mode === 'existing' &&
+        selectedCompany &&
+        (existingCompanyEmail.trim() !== (selectedCompany.email ?? '') ||
+          existingCompanyPhone.trim() !== (selectedCompany.phone ?? ''))
+      ) {
+        await apiFetch(`/companies/${selectedCompany.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            email: existingCompanyEmail.trim(),
+            phone: existingCompanyPhone.trim(),
+          }),
+        });
+      }
+
       await apiFetch('/communications', {
         method: 'POST',
         body: JSON.stringify({
           ...detailsPayload(values),
+          scheduledEmail: recipientEmail ? scheduledEmailPayload(scheduledEmail) : undefined,
           ...(mode === 'existing'
             ? { companyId: values.companyId }
             : {
@@ -218,18 +253,46 @@ export function NewCommunicationForm({ fixedUser }: { fixedUser?: CommunicationU
             </Field>
           </div>
         ) : (
-          <Field label="Εταιρεία">
-            <SearchSelect
-              options={companyOptions}
-              value={values.companyId}
-              onChange={(id) => update('companyId', id)}
-              disabled={loading}
-              placeholder={loading ? 'Φόρτωση εταιρειών…' : 'Επιλέξτε εταιρεία'}
-              searchPlaceholder="Αναζήτηση εταιρείας…"
-              searchLabel="Αναζήτηση εταιρείας"
-              emptyLabel="Δεν βρέθηκε εταιρεία."
-            />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Field label="Εταιρεία">
+                <SearchSelect
+                  options={companyOptions}
+                  value={values.companyId}
+                  onChange={(id) => {
+                    update('companyId', id);
+                    setExistingEmailDraft(undefined);
+                    setExistingPhoneDraft(undefined);
+                  }}
+                  disabled={loading}
+                  placeholder={loading ? 'Φόρτωση εταιρειών…' : 'Επιλέξτε εταιρεία'}
+                  searchPlaceholder="Αναζήτηση εταιρείας…"
+                  searchLabel="Αναζήτηση εταιρείας"
+                  emptyLabel="Δεν βρέθηκε εταιρεία."
+                />
+              </Field>
+            </div>
+            {selectedCompany ? (
+              <>
+                <Field label="Email" hint="Χρησιμοποιείται ως παραλήπτης προγραμματισμένου email.">
+                  <input
+                    type="email"
+                    value={existingCompanyEmail}
+                    onChange={(event) => setExistingEmailDraft(event.target.value)}
+                    className={controlClass}
+                  />
+                </Field>
+                <Field label="Τηλέφωνο">
+                  <input
+                    required
+                    value={existingCompanyPhone}
+                    onChange={(event) => setExistingPhoneDraft(event.target.value)}
+                    className={controlClass}
+                  />
+                </Field>
+              </>
+            ) : null}
+          </div>
         )}
       </Card>
 
@@ -240,6 +303,15 @@ export function NewCommunicationForm({ fixedUser }: { fixedUser?: CommunicationU
         disabled={loading}
         onChange={update}
       />
+
+      {recipientEmail ? (
+        <EmailComposer
+          recipientEmail={recipientEmail}
+          companyName={recipientCompanyName}
+          values={scheduledEmail}
+          onChange={setScheduledEmail}
+        />
+      ) : null}
 
       {users.length === 0 && !loading ? (
         <p role="alert" className="text-sm text-negative">

@@ -1,8 +1,5 @@
-import {
-  sendEmail,
-  transactionalEmailRecipient,
-  transactionalEmailSender,
-} from '../../lib/resend.js';
+import { sendEmail, transactionalEmailSender } from '../../lib/resend.js';
+import { renderTransactionalEmail } from '../../lib/transactional-email.js';
 
 const OFFICE_TIME_ZONE = 'Europe/Athens';
 
@@ -11,15 +8,6 @@ const expiresAtFormat = new Intl.DateTimeFormat('el-GR', {
   dateStyle: 'long',
   timeStyle: 'short',
 });
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
 
 /** Deliver the one-time link that lets a new account choose its first password. */
 export async function sendAccountInvitationEmail({
@@ -35,27 +23,37 @@ export async function sendAccountInvitationEmail({
 }): Promise<boolean> {
   const expiry = expiresAtFormat.format(expiresAt);
 
-  const text = `Γεια σας,
+  const text = `Καλώς ήρθατε στο Onix CRM
 
-Δημιουργήθηκε λογαριασμός για εσάς στο Onix CRM.
+Δημιουργήθηκε ένας λογαριασμός εργασίας για εσάς στο Onix CRM.
 
-Ορίστε τον κωδικό πρόσβασής σας από τον παρακάτω σύνδεσμο:
+Ενεργοποιήστε τον λογαριασμό σας και ορίστε τον κωδικό πρόσβασής σας:
 ${activationUrl}
 
-Ο σύνδεσμος είναι μίας χρήσης και ισχύει έως ${expiry}.
+Η πρόσκληση λήγει στις ${expiry}.
 
-Αν δεν περιμένατε αυτή την πρόσκληση, αγνοήστε αυτό το email.`;
+Ο σύνδεσμος είναι προσωπικός και μίας χρήσης. Αν δεν περιμένατε αυτή την πρόσκληση, αγνοήστε αυτό το email.`;
 
   return sendEmail({
     from: transactionalEmailSender(),
-    to: transactionalEmailRecipient(email),
+    to: email,
     subject: 'Πρόσκληση στο Onix CRM',
     text,
-    html: `<p>Γεια σας,</p>
-<p>Δημιουργήθηκε λογαριασμός για εσάς στο <strong>Onix CRM</strong>.</p>
-<p><a href="${escapeHtml(activationUrl)}">Ορίστε τον κωδικό πρόσβασής σας</a></p>
-<p>Ο σύνδεσμος είναι μίας χρήσης και ισχύει έως ${escapeHtml(expiry)}.</p>
-<p>Αν δεν περιμένατε αυτή την πρόσκληση, αγνοήστε αυτό το email.</p>`,
+    html: renderTransactionalEmail({
+      preheader: 'Ενεργοποιήστε τον νέο σας λογαριασμό στο Onix CRM.',
+      eyebrow: 'ΠΡΟΣΚΛΗΣΗ ΣΥΝΕΡΓΑΣΙΑΣ',
+      title: 'Καλώς ήρθατε στο Onix CRM',
+      paragraphs: [
+        'Δημιουργήθηκε ένας λογαριασμός εργασίας για εσάς.',
+        'Ενεργοποιήστε τον λογαριασμό σας και ορίστε τον κωδικό πρόσβασής σας για να ξεκινήσετε.',
+      ],
+      actionLabel: 'Ενεργοποίηση λογαριασμού',
+      actionUrl: activationUrl,
+      detailLabel: 'Η ΠΡΟΣΚΛΗΣΗ ΛΗΓΕΙ',
+      detailValue: expiry,
+      notice:
+        'Ο σύνδεσμος είναι προσωπικός και μίας χρήσης. Αν δεν περιμένατε αυτή την πρόσκληση, μπορείτε να αγνοήσετε το email.',
+    }),
     idempotencyKey: `account-invitation/${invitationId}/${expiresAt.getTime()}`,
   });
 }

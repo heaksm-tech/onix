@@ -12,6 +12,12 @@ import {
   type CommunicationDetailsValues,
   type CommunicationUser,
 } from '@/components/communications/details-fields';
+import {
+  EmailComposer,
+  EMPTY_SCHEDULED_EMAIL,
+  scheduledEmailPayload,
+  type ScheduledEmailValues,
+} from '@/components/communications/email-composer';
 import { Field, controlClass } from '@/components/field';
 import { SearchSelect, type SearchSelectOption } from '@/components/search-select';
 import { ApiError, apiFetch } from '@/lib/api';
@@ -43,6 +49,16 @@ function initialValues(communication: CommunicationDetail): FormValues {
   };
 }
 
+function initialScheduledEmail(communication: CommunicationDetail): ScheduledEmailValues {
+  return communication.scheduledEmail
+    ? {
+        subject: communication.scheduledEmail.subject,
+        body: communication.scheduledEmail.body,
+        scheduledFor: toDateTimeLocal(communication.scheduledEmail.scheduledFor),
+      }
+    : EMPTY_SCHEDULED_EMAIL;
+}
+
 export function EditCommunicationForm({
   communication,
   fixedUser,
@@ -59,6 +75,9 @@ export function EditCommunicationForm({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
+  const [scheduledEmail, setScheduledEmail] = useState<ScheduledEmailValues>(() =>
+    initialScheduledEmail(communication),
+  );
 
   /**
    * The name being typed, or `undefined` while it is simply the selected
@@ -66,6 +85,8 @@ export function EditCommunicationForm({
    * field follows the select — and the list arriving — without an effect.
    */
   const [nameDraft, setNameDraft] = useState<string>();
+  const [emailDraft, setEmailDraft] = useState<string>();
+  const [phoneDraft, setPhoneDraft] = useState<string>();
   /** A name the API rejected as taken — see the note in the new-communication form. */
   const [takenName, setTakenName] = useState<string>();
 
@@ -95,8 +116,23 @@ export function EditCommunicationForm({
     () =>
       companies.some((company) => company.id === values.companyId)
         ? companies
-        : [{ id: communication.companyId, name: communication.companyName }, ...companies],
-    [companies, values.companyId, communication.companyId, communication.companyName],
+        : [
+            {
+              id: communication.companyId,
+              name: communication.companyName,
+              email: communication.companyEmail,
+              phone: communication.companyPhone,
+            },
+            ...companies,
+          ],
+    [
+      companies,
+      values.companyId,
+      communication.companyId,
+      communication.companyName,
+      communication.companyEmail,
+      communication.companyPhone,
+    ],
   );
 
   const companySelectOptions = useMemo<SearchSelectOption[]>(
@@ -112,10 +148,13 @@ export function EditCommunicationForm({
       ? users
       : [{ id: communication.userId, name: communication.userName, email: '—' }, ...users];
 
-  const storedName =
-    companyOptions.find((company) => company.id === values.companyId)?.name ??
-    communication.companyName;
+  const selectedCompany = companyOptions.find((company) => company.id === values.companyId);
+  const storedName = selectedCompany?.name ?? communication.companyName;
+  const storedEmail = selectedCompany?.email ?? '';
+  const storedPhone = selectedCompany?.phone ?? '';
   const nameValue = nameDraft ?? storedName;
+  const emailValue = emailDraft ?? storedEmail;
+  const phoneValue = phoneDraft ?? storedPhone;
   const nameTaken =
     Boolean(companyWithName(companyOptions, nameValue, values.companyId)) ||
     takenName === companyNameKey(nameValue);
@@ -123,6 +162,9 @@ export function EditCommunicationForm({
   // counts as a change: «ΑΒΓ ΕΠΕ» and «Αβγ ΕΠΕ» are the same name to the unique
   // index, and correcting one to the other is a rename worth allowing.
   const nameChanged = nameValue.trim() !== '' && nameValue.trim() !== storedName;
+  const emailChanged = emailValue.trim() !== storedEmail;
+  const phoneChanged = phoneValue.trim() !== storedPhone;
+  const companyChanged = nameChanged || emailChanged || phoneChanged;
 
   /**
    * Rename the selected company, as its own request.
@@ -132,18 +174,25 @@ export function EditCommunicationForm({
    * because a name typed into a field and then not saved is a name lost. The
    * hint under the field is what makes the reach of it plain.
    */
-  async function renameCompany(name: string) {
+  async function updateCompany() {
     const { company } = await apiFetch<{ company: CompanyOption }>(
       `/companies/${values.companyId}`,
-      { method: 'PATCH', body: JSON.stringify({ name }) },
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: nameValue.trim(),
+          email: emailValue.trim(),
+          phone: phoneValue.trim(),
+        }),
+      },
     );
 
     setCompanies((current) =>
-      current.map((option) =>
-        option.id === company.id ? { ...option, name: company.name } : option,
-      ),
+      current.map((option) => (option.id === company.id ? company : option)),
     );
     setNameDraft(undefined);
+    setEmailDraft(undefined);
+    setPhoneDraft(undefined);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -157,11 +206,15 @@ export function EditCommunicationForm({
     try {
       // First: a name the API refuses must not leave the communication saved
       // against a company that was supposed to be called something else.
-      if (nameChanged) await renameCompany(nameValue.trim());
+      if (companyChanged) await updateCompany();
 
       await apiFetch(`/communications/${communication.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...detailsPayload(values), companyId: values.companyId }),
+        body: JSON.stringify({
+          ...detailsPayload(values),
+          companyId: values.companyId,
+          scheduledEmail: emailValue.trim() ? scheduledEmailPayload(scheduledEmail) : undefined,
+        }),
       });
 
       router.push(detailHref);
@@ -187,7 +240,7 @@ export function EditCommunicationForm({
         <div className="mb-5">
           <h2 className="text-sm font-semibold">Εταιρεία</h2>
           <p className="mt-1 text-sm text-ink-secondary">
-            Επιλέξτε άλλη εταιρεία ή διορθώστε την επωνυμία της.
+            Επιλέξτε άλλη εταιρεία ή ενημερώστε τα στοιχεία επικοινωνίας της.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -202,6 +255,8 @@ export function EditCommunicationForm({
                 update('companyId', id);
                 // The name field belongs to whichever company is selected.
                 setNameDraft(undefined);
+                setEmailDraft(undefined);
+                setPhoneDraft(undefined);
                 setTakenName(undefined);
               }}
               searchPlaceholder="Αναζήτηση εταιρείας…"
@@ -223,6 +278,24 @@ export function EditCommunicationForm({
               className={controlClass}
             />
           </Field>
+          <Field label="Email" hint="Χρησιμοποιείται ως παραλήπτης προγραμματισμένου email.">
+            <input
+              type="email"
+              disabled={loading}
+              value={emailValue}
+              onChange={(event) => setEmailDraft(event.target.value)}
+              className={controlClass}
+            />
+          </Field>
+          <Field label="Τηλέφωνο">
+            <input
+              required
+              disabled={loading}
+              value={phoneValue}
+              onChange={(event) => setPhoneDraft(event.target.value)}
+              className={controlClass}
+            />
+          </Field>
         </div>
       </Card>
 
@@ -233,6 +306,15 @@ export function EditCommunicationForm({
         disabled={loading}
         onChange={update}
       />
+
+      {emailValue.trim() ? (
+        <EmailComposer
+          recipientEmail={emailValue.trim()}
+          companyName={nameValue.trim()}
+          values={scheduledEmail}
+          onChange={setScheduledEmail}
+        />
+      ) : null}
 
       {error ? (
         <p role="alert" className="text-sm text-negative">

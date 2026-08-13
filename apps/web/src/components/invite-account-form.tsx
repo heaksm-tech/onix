@@ -81,7 +81,6 @@ export function InviteAccountForm() {
               onChange={(event) => update('email', event.target.value)}
               aria-invalid={Boolean(fieldErrors.email)}
               className={controlClass}
-              placeholder="onoma@melas.gr"
             />
           </Field>
           <Field label="Ρόλος" error={fieldErrors.role}>

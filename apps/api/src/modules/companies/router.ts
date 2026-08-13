@@ -33,12 +33,27 @@ const idParams = z.object({
     .regex(/^[1-9]\d*$/, 'Μη έγκυρο αναγνωριστικό εταιρείας.'),
 });
 
-// Matches the `name` column width, so an over-long value is a 422 naming the
-// field rather than a 500 from Postgres.
-const renameInput = z.object({ name: z.string().trim().min(1).max(255) });
+const editableEmail = z
+  .string()
+  .trim()
+  .max(255)
+  .refine(
+    (value) => value === '' || z.string().email().safeParse(value).success,
+    'Συμπληρώστε μια έγκυρη διεύθυνση email.',
+  );
+
+// Every field remains optional for backwards-compatible PATCH semantics. The
+// edit form sends all three, including an empty email when it is being cleared.
+const updateInput = z
+  .object({
+    name: z.string().trim().min(1).max(255).optional(),
+    email: editableEmail.optional(),
+    phone: z.string().trim().min(1).max(30).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, 'Δεν δόθηκαν αλλαγές για την εταιρεία.');
 
 type IdParams = z.infer<typeof idParams>;
-type RenameInput = z.infer<typeof renameInput>;
+type UpdateInput = z.infer<typeof updateInput>;
 
 export const companiesRouter: Router = Router();
 
@@ -53,7 +68,7 @@ companiesRouter.get('/companies', async (_req, res) => {
 });
 
 /**
- * Rename a company.
+ * Update a company's shared identity and contact details.
  *
  * The name is the company's identity, so this reaches every communication that
  * points at it — which is exactly the point, and why the form that offers it
@@ -66,24 +81,27 @@ companiesRouter.get('/companies', async (_req, res) => {
 companiesRouter.patch(
   '/companies/:id',
   validate(idParams, 'params'),
-  validate(renameInput),
+  validate(updateInput),
   async (req, res) => {
     const { id } = req.params as IdParams;
-    const { name } = req.body as RenameInput;
+    const input = req.body as UpdateInput;
+    const changesEmail = Object.prototype.hasOwnProperty.call(input, 'email');
 
-    let updated: { id: string; name: string } | undefined;
+    let updated: Company | undefined;
     try {
-      updated = await queryOne<{ id: string; name: string }>(
+      updated = await queryOne<Company>(
         `UPDATE companies
-            SET name = $2
+            SET name = coalesce($2, name),
+                email = CASE WHEN $3::boolean THEN $4 ELSE email END,
+                phone = coalesce($5, phone)
           WHERE id = $1
             AND deleted_at IS NULL
-          RETURNING id, name`,
-        [id, name],
+          RETURNING id, name, email, phone`,
+        [id, input.name ?? null, changesEmail, input.email || null, input.phone ?? null],
       );
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
-      throw HttpError.conflict(`Η εταιρεία «${name}» υπάρχει ήδη.`);
+      throw HttpError.conflict(`Η εταιρεία «${input.name}» υπάρχει ήδη.`);
     }
 
     if (!updated) throw HttpError.notFound('Η εταιρεία δεν βρέθηκε.');

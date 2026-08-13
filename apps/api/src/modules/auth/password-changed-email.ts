@@ -1,8 +1,4 @@
-import {
-  sendEmail,
-  transactionalEmailRecipient,
-  transactionalEmailSender,
-} from '../../lib/resend.js';
+import { sendEmail, transactionalEmailSender } from '../../lib/resend.js';
 
 const OFFICE_TIME_ZONE = 'Europe/Athens';
 
@@ -43,7 +39,7 @@ export async function sendPasswordChangedEmail({
 
   return sendEmail({
     from: transactionalEmailSender(),
-    to: transactionalEmailRecipient(email),
+    to: email,
     subject: 'Ο κωδικός πρόσβασής σας άλλαξε',
     text,
     html: `<p>Γεια σας ${escapeHtml(name)},</p>

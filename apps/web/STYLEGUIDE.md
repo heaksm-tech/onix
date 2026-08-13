@@ -5,7 +5,7 @@ new section, screen, or component — human or AI agent — read this first and
 follow it. When something you need is not covered here, extend the existing
 patterns rather than inventing new ones, and document the addition here.
 
-Onix is an internal B2B CRM for S. D. Melas Trading Business. The UI language
+Onix is an internal B2B CRM for Melas Energiaki. The UI language
 is **Greek**. The design language is **minimal but refined**: one accent color,
 card-based surfaces, hairline borders, generous whitespace, no decoration that
 does not carry information.
@@ -190,6 +190,15 @@ rounded-xl`). Everything card-like uses it.
   active one with `aria-activedescendant`, which is what lets one control both
   type and choose. Because it has no native validity, a form using it validates
   the value itself, the way both communication forms already do.
+- **`EmailComposer`** (`communications/email-composer.tsx`) — the large native
+  dialog used by both communication forms for one outbound company email. It
+  is offered only while the selected company has an email address, keeps
+  unfinished modal edits local until «Προσθήκη στην επικοινωνία», and stores
+  plain text so the delivered message preserves the author's line breaks
+  without accepting executable markup. The communication detail presents every
+  scheduled-email row in an expandable history with an explicit status; only a
+  pending or processing row reopens in the editor, so a sent row remains
+  readable while the user can compose the next email.
 - **`icons.tsx`** — hand-rolled 24×24 stroke icons (`stroke-width 1.75`, round
   caps/joins, Lucide-style geometry). New icons are added here following the
   same recipe; **never install an icon package**. Default rendered sizes:
@@ -199,7 +208,9 @@ rounded-xl`). Everything card-like uses it.
   redraw; the favicon (`src/app/icon.svg`) must stay visually in sync with it.
 - **Shell** (`src/components/shell/`) — `Sidebar` + `Topbar` + `MobileNav`;
   pages never render their own chrome. Breadcrumbs derive automatically from
-  nav. `NavList` is the nav rows themselves, rendered by both the sidebar and
+  nav. `ThemeSwitch` lives in the topbar from `md` up, is hidden on mobile and
+  persists an explicit light/dark preference while the default continues to
+  follow the OS. `NavList` is the nav rows themselves, rendered by both the sidebar and
   the mobile drawer — add nav behavior there, not in either shell.
   `AccountMenu` is the one home of account actions at every viewport: identity,
   password change and sign-out. `UserCard` in the sidebar/drawer is identity
@@ -329,9 +340,9 @@ or cast doubt on a password that already changed: the response carries
 `notificationSent`, and the form reports the partial outcome explicitly.
 
 Email configuration belongs to the API only. In development it sends from
-`onboarding@resend.dev` to `RESEND_DEV_TO` (the safe Resend delivered address by
-default); in production it sends from `RESEND_FROM_EMAIL` at the verified domain
-to the account's own email. `NODE_ENV` chooses the branch. No Resend key or
+`onboarding@resend.dev`; in production it sends from `RESEND_FROM_EMAIL` at the
+verified domain. Both environments send to the account's own email, while
+`NODE_ENV` chooses the sender. No Resend key or
 sender address may enter the web package or a `NEXT_PUBLIC_*` value.
 
 ### Account invitations

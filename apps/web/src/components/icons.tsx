@@ -120,6 +120,18 @@ export function IconCheck(props: IconProps) {
   );
 }
 
+export function IconTrash(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 15H6L5 6" />
+      <path d="M10 11v5" />
+      <path d="M14 11v5" />
+    </Base>
+  );
+}
+
 export function IconSearch(props: IconProps) {
   return (
     <Base {...props}>
@@ -134,6 +146,48 @@ export function IconBell(props: IconProps) {
     <Base {...props}>
       <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
       <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </Base>
+  );
+}
+
+export function IconMail(props: IconProps) {
+  return (
+    <Base {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </Base>
+  );
+}
+
+export function IconClock(props: IconProps) {
+  return (
+    <Base {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </Base>
+  );
+}
+
+export function IconSun(props: IconProps) {
+  return (
+    <Base {...props}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="m4.93 4.93 1.42 1.42" />
+      <path d="m17.65 17.65 1.42 1.42" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="m6.35 17.65-1.42 1.42" />
+      <path d="m19.07 4.93-1.42 1.42" />
+    </Base>
+  );
+}
+
+export function IconMoon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
     </Base>
   );
 }

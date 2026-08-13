@@ -62,12 +62,6 @@ const envSchema = z
     RESEND_API_KEY: optionalSecret,
     /** Address at the verified production domain; the display name is added by the API. */
     RESEND_FROM_EMAIL: optionalEmail,
-    /**
-     * Development never sends to the account being edited. Resend's own safe
-     * delivered address is the default; set this to the address attached to
-     * your Resend account when you want the message in a real inbox.
-     */
-    RESEND_DEV_TO: z.string().trim().email().default('delivered+password-change@resend.dev'),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') return;
@@ -114,7 +108,6 @@ export const env = {
   isTest: parsed.data.NODE_ENV === 'test',
   resendApiKey: parsed.data.RESEND_API_KEY,
   resendFromEmail: parsed.data.RESEND_FROM_EMAIL,
-  resendDevTo: parsed.data.RESEND_DEV_TO,
   sessionCookieSecure:
     parsed.data.SESSION_COOKIE_SECURE === undefined
       ? parsed.data.NODE_ENV === 'production'

@@ -6,6 +6,7 @@ import { HttpError } from '../../lib/http-error.js';
 import { requireAuth } from '../../middleware/require-auth.js';
 import { validate } from '../../middleware/validate.js';
 import { hashInvitationToken, INVITATION_TOKEN_MAX_LENGTH } from '../accounts/invitation-token.js';
+import { createNotificationsForRole } from '../notifications/service.js';
 import { sendPasswordChangedEmail } from './password-changed-email.js';
 import {
   MIN_PASSWORD_LENGTH,
@@ -224,6 +225,13 @@ authRouter.post('/auth/activate-account', validate(activateAccountInput), async 
     );
     await client.query('DELETE FROM sessions WHERE user_id = $1', [user.id]);
     const session = await createSession(user.id, client);
+
+    await createNotificationsForRole(client, {
+      role: 'admin',
+      title: 'Νέος ενεργός λογαριασμός',
+      body: `Ο λογαριασμός ${user.email} ενεργοποιήθηκε και ο χρήστης μπορεί πλέον να συνδεθεί.`,
+      actionUrl: '/accounts',
+    });
 
     return { user, session };
   });

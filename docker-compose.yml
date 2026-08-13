@@ -11,11 +11,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-onix}
       POSTGRES_DB: ${POSTGRES_DB:-onix_dev}
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - onix-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-onix} -d ${POSTGRES_DB:-onix_dev}']
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-onix} -d ${POSTGRES_DB:-onix_dev}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -40,14 +44,12 @@ services:
       # set APP_URL alongside it so the link still reaches the web service.
       APP_URL: ${APP_URL:-http://localhost:3000}
       ACCOUNT_INVITATION_TTL_HOURS: ${ACCOUNT_INVITATION_TTL_HOURS:-48}
-      # Development uses Resend's test sender and traps every message at the
-      # safe recipient below; see .env.example.
+      # Development uses Resend's test sender but delivers to the account email.
       RESEND_API_KEY: ${RESEND_API_KEY:-}
-      RESEND_DEV_TO: ${RESEND_DEV_TO:-delivered+password-change@resend.dev}
     ports:
       # Published in development so you can curl the API directly. The
       # production stack deliberately does not publish it.
-      - '${API_PORT:-4000}:4000'
+      - "${API_PORT:-4000}:4000"
     volumes:
       # Bind-mount the source for hot reload, but keep the image's node_modules
       # (built for the container's platform) from being shadowed by the host's.
@@ -56,6 +58,25 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  reminder-worker:
+    build:
+      context: ./apps/api
+      target: dev
+    container_name: onix-reminder-worker
+    restart: unless-stopped
+    command: npm run dev:reminders
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      DATABASE_URL: postgres://${POSTGRES_USER:-onix}:${POSTGRES_PASSWORD:-onix}@postgres:5432/${POSTGRES_DB:-onix_dev}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+    volumes:
+      - ./apps/api:/app
+      - /app/node_modules
+    depends_on:
+      - api
 
   web:
     build:
@@ -68,9 +89,9 @@ services:
       # The only address of the API anywhere in the web app. Browser code goes
       # through this app's /api/v1 route, so it is never told where the API is.
       API_URL: http://api:4000/api/v1
-      WATCHPACK_POLLING: 'true'
+      WATCHPACK_POLLING: "true"
     ports:
-      - '${WEB_PORT:-3000}:3000'
+      - "${WEB_PORT:-3000}:3000"
     volumes:
       - ./apps/web:/app
       - /app/node_modules

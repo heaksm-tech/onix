@@ -10,8 +10,10 @@
   },
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "dev:reminders": "tsx watch --env-file-if-exists=.env src/reminder-worker.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=.env dist/index.js",
+    "reminders:start": "node --env-file-if-exists=.env dist/reminder-worker.js",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.migrations.json --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
