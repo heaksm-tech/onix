@@ -41,6 +41,7 @@
     "migrate:create": "npm --prefix apps/api run migrate:create --"
   },
   "devDependencies": {
-    "concurrently": "^10.0.4"
+    "concurrently": "^10.0.4",
+    "tsx": "^4.23.12"
   }
 }
